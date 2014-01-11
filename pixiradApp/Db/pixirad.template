@@ -200,7 +200,7 @@ record(ai, "$(P)$(R)HVValue_RBV")
 {
     field(DTYP, "asynFloat64")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_VALUE")
-    field(DESC, "Energy threshold")
+    field(DESC, "High voltage value")
     field(EGU,  "V")
     field(LOPR, "0")
     field(HOPR, "400")
@@ -241,6 +241,26 @@ record(bi,"$(P)$(R)HVMode_RBV") {
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_MODE")
     field(ZNAM, "Manual")
     field(ONAM, "Auto")
+    field(SCAN, "I/O Intr")
+}
+
+record(ao, "$(P)$(R)HVDelay")
+{
+    field(PINI, "YES")
+    field(DTYP, "asynFloat64")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_DELAY")
+    field(DESC, "High voltage delay")
+    field(EGU,  "s")
+    field(PREC, "1")
+}
+
+record(ai, "$(P)$(R)HVDelay_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_DELAY")
+    field(DESC, "High voltage delay")
+    field(EGU,  "s")
+    field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
 
