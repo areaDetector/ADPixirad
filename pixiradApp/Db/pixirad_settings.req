@@ -11,5 +11,4 @@ $(P)$(R)SyncInPolarity
 $(P)$(R)SyncOutPolarity
 $(P)$(R)DownloadSpeed
 $(P)$(R)ImageFileTmot
-$(P)$(R)CoolingValue
 $(P)$(R)CoolingState
