@@ -5,6 +5,7 @@ dbLoadDatabase("$(TOP)/dbd/pixiradApp.dbd")
 pixiradApp_registerRecordDeviceDriver(pdbbase) 
 
 epicsEnvSet("PREFIX", "13PR1:")
+epicsEnvSet("IPPORT", "IP_PIXI")
 epicsEnvSet("PORT",   "PIXI")
 epicsEnvSet("QSIZE",  "20")
 epicsEnvSet("XSIZE",  "512")
@@ -13,12 +14,14 @@ epicsEnvSet("NCHANS", "2048")
 
 ###
 # Create the asyn port to talk to the Pixirad on port 3300.  Don't use processEos.
-drvAsynIPPortConfigure("PIXI","164.54.160.204:3300", 0, 0, 1)
+drvAsynIPPortConfigure("$(IPPORT)","164.54.160.204:3300", 0, 0, 1)
+asynSetTraceIOMask($(IPPORT), 0, 2)
+asynSetTraceMask($(IPPORT), 0, 9)
 
-pixiradConfig("$(PORT)", "PIXI", $(XSIZE), $(YSIZE))
+pixiradConfig("$(PORT)", "$(IPPORT)", $(XSIZE), $(YSIZE))
 dbLoadRecords("$(ADCORE)/db/ADBase.template", "P=$(PREFIX),R=cam1:,PORT=$(PORT),ADDR=0,TIMEOUT=1")
 dbLoadRecords("$(ADCORE)/db/NDFile.template", "P=$(PREFIX),R=cam1:,PORT=$(PORT),ADDR=0,TIMEOUT=1")
-dbLoadRecords("$(ADPIXIRAD)/db/pixirad.template","P=$(PREFIX),R=cam1:,PORT=$(PORT),ADDR=0,TIMEOUT=1,CAMSERVER_PORT=camserver")
+dbLoadRecords("$(ADPIXIRAD)/db/pixirad.template","P=$(PREFIX),R=cam1:,PORT=$(PORT),ADDR=0,TIMEOUT=1,SERVER_PORT=$(IPPORT)")
 
 # Create a standard arrays plugin
 NDStdArraysConfigure("Image1", 5, 0, "$(PORT)", 0, 0)
@@ -29,8 +32,6 @@ dbLoadRecords("$(ADCORE)/db/NDStdArrays.template", "P=$(PREFIX),R=image1:,PORT=I
 < $(ADCORE)/iocBoot/commonPlugins.cmd
 set_requestfile_path("$(ADPIXIRAD)/pixiradApp/Db")
 
-#asynSetTraceMask("$(PORT)",0,255)
-#asynSetTraceMask("$(PORT)",0,3)
 
 
 iocInit()
