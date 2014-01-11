@@ -93,7 +93,7 @@ record(bi,"$(P)$(R)SaveData_RBV") {
     field(DTYP, "asynInt32")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SAVE_DATA")
     field(ZNAM, "No")
-    field(0NAM, "Yes")
+    field(ONAM, "Yes")
     field(SCAN, "I/O Intr")
 }
 
@@ -222,7 +222,7 @@ record(bi,"$(P)$(R)HVState_RBV") {
     field(DTYP, "asynInt32")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_STATE")
     field(ZNAM, "Off")
-    field(0NAM, "On")
+    field(ONAM, "On")
     field(SCAN, "I/O Intr")
 }
 
@@ -298,32 +298,6 @@ record(bi,"$(P)$(R)DownloadSpeed_RBV") {
     field(SCAN, "I/O Intr")
 }
 
-record(ao, "$(P)$(R)CoolingValue")
-{
-    field(DESC, "Cooling value")
-    field(PINI, "YES")
-    field(DTYP, "asynFloat64")
-    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COOLING_VALUE")
-    field(EGU,  "V")
-    field(DRVL, "-40")
-    field(LOPR, "-40")
-    field(DRVH, "30")
-    field(HOPR, "30")
-    field(PREC, "1")
-}
-
-record(ai, "$(P)$(R)CoolingValue_RBV")
-{
-    field(DESC, "Cooling value")
-    field(DTYP, "asynFloat64")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COOLING_VALUE")
-    field(EGU,  "V")
-    field(LOPR, "-40")
-    field(HOPR, "30")
-    field(PREC, "1")
-    field(SCAN, "I/O Intr")
-}
-
 record(bo,"$(P)$(R)CoolingState") {
     field(DESC, "Cooling state")
     field(PINI, "YES")
@@ -338,7 +312,7 @@ record(bi,"$(P)$(R)CoolingState_RBV") {
     field(DTYP, "asynInt32")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COOLING_STATE")
     field(ZNAM, "Off")
-    field(0NAM, "On")
+    field(ONAM, "On")
     field(SCAN, "I/O Intr")
 }
 
