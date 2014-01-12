@@ -6,6 +6,7 @@ include $(TOP)/configure/CONFIG
 LIBRARY_IOC += pixirad
 
 LIB_SRCS += pixirad.cpp
+LIB_SRCS += pixiradLV.cpp
 
 DBD += pixiradSupport.dbd
 
