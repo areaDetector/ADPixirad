@@ -17,9 +17,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <ctype.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 
 #include <epicsTime.h>
 #include <epicsThread.h>
@@ -27,6 +24,7 @@
 #include <epicsString.h>
 #include <epicsStdio.h>
 #include <epicsMutex.h>
+#include <osiSock.h>
 #include <iocsh.h>
 #include <epicsExport.h>
 
@@ -36,21 +34,15 @@
 
 /** Messages to/from server */
 #define MAX_MESSAGE_SIZE 256 
-#define MAX_FILENAME_LEN 256
-/** Time to poll when reading from server */
-#define ASYN_POLL_TIME .01 
 #define SERVER_DEFAULT_TIMEOUT 1.0
 /** Additional time to wait for a server response after the acquire should be complete */ 
 #define SERVER_ACQUIRE_TIMEOUT 10.
-/** Time between checking to see if image file is complete */
-#define FILE_READ_DELAY .01
 
 /** Save data */
 typedef enum {
     SaveDataOff,
     SaveDataOn
 } PixiradSaveDataState_t;
-static const char *PixiradSaveDataStateStrings[] = {"OFF", "ON"};
 
 /** Trigger modes */
 typedef enum {
@@ -65,28 +57,34 @@ typedef enum {
     CoolingOff,
     CoolingOn
 } PixiradCoolingState_t;
-static const char *PixiradCoolingStateStrings[] = {"OFF", "ON"};
 
 /** High voltage state */
 typedef enum {
     HVOff,
     HVOn
 } PixiradHVState_t;
-static const char *PixiradHVStateStrings[] = {"OFF", "ON"};
 
 /** High voltage mode */
 typedef enum {
     HVManual,
     HVAuto
 } PixiradHVMode_t;
-static const char *PixiradHVModeStrings[] = {"MANUAL", "AUTO"};
+static const char *PixiradHVModeStrings[] = {"STDHV", "AUTOHV"};
 
-/** Sync polarity */
+/** Sync in/out polarity */
 typedef enum {
     SyncPos,
     SyncNeg
 } PixiradSyncPolarity_t;
 static const char *PixiradSyncPolarityStrings[] = {"POS", "NEG"};
+
+/** Sync out function */
+typedef enum {
+    SyncOutShutter,
+    SyncOutReadoutDone,
+    SyncOutRead
+} PixiradSyncOutFunction_t;
+static const char *PixiradSyncOutFunctionStrings[] = {"SHUTTER", "RODONE", "READ"};
 
 /** Download speed */
 typedef enum {
@@ -120,6 +118,7 @@ static const char *driverName = "pixirad";
 #define PixiradHVDelayString         "HV_DELAY"
 #define PixiradSyncInPolarityString  "SYNC_IN_POLARITY"
 #define PixiradSyncOutPolarityString "SYNC_OUT_POLARITY"
+#define PixiradSyncOutFunctionString "SYNC_OUT_FUNCTION"
 #define PixiradDownloadSpeedString   "DOWNLOAD_SPEED"
 #define PixiradImageFileTmotString   "IMAGE_FILE_TMOT"
 #define PixiradCoolingStateString    "COOLING_STATE"
@@ -132,7 +131,8 @@ static const char *driverName = "pixirad";
 /** Driver for PiXirad pixel array detectors using their server server over TCP/IP socket */
 class pixirad : public ADDriver {
 public:
-    pixirad(const char *portName, const char *serverPort,
+    pixirad(const char *portName, const char *commandPortName,
+            int dataPortNumber, const char *statusPortName,
             int maxSizeX, int maxSizeY,
             int maxBuffers, size_t maxMemory,
             int priority, int stackSize);
@@ -142,7 +142,8 @@ public:
     virtual asynStatus writeFloat64(asynUser *pasynUser, epicsFloat64 value);
     void report(FILE *fp, int details);
     /* These should be private but are called from C so must be public */
-    void pixiradTask(); 
+    void statusTask();
+    void dataPortListenerTask();
     
 protected:
     int PixiradCollectionMode;
@@ -158,6 +159,7 @@ protected:
     int PixiradHVDelay;
     int PixiradSyncInPolarity;
     int PixiradSyncOutPolarity;
+    int PixiradSyncOutFunction;
     int PixiradDownloadSpeed;
     int PixiradImageFileTmot;
     int PixiradCoolingState;
@@ -175,26 +177,33 @@ private:
     asynStatus setSync();
     asynStatus startAcquire();
     asynStatus stopAcquire();
-    asynStatus pixiradStatus();
    
     /* Our data */
     int imagesRemaining;
     epicsEventId startEventId;
     epicsEventId stopEventId;
+    int dataPortNumber;
     char toServer[MAX_MESSAGE_SIZE];
     char fromServer[MAX_MESSAGE_SIZE];
-    asynUser *pasynUserServer;
+    asynUser *pasynUserCommand;
+    asynUser *pasynUserStatus;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
 
-static void pixiradTaskC(void *drvPvt)
+static void statusTaskC(void *drvPvt)
 {
     pixirad *pPvt = (pixirad *)drvPvt;
     
-    pPvt->pixiradTask();
+    pPvt->statusTask();
 }
 
+static void dataPortListenerTaskC(void *drvPvt)
+{
+    pixirad *pPvt = (pixirad *)drvPvt;
+    
+    pPvt->dataPortListenerTask();
+}
 
 /** Constructor for Pixirad driver; most parameters are simply passed to ADDriver::ADDriver.
   * After calling the base class constructor this method creates a thread to collect the detector data, 
@@ -212,10 +221,11 @@ static void pixiradTaskC(void *drvPvt)
   * \param[in] priority The thread priority for the asyn port driver thread if ASYN_CANBLOCK is set in asynFlags.
   * \param[in] stackSize The stack size for the asyn port driver thread if ASYN_CANBLOCK is set in asynFlags.
   */
-pixirad::pixirad(const char *portName, const char *serverPort,
-                                int maxSizeX, int maxSizeY,
-                                int maxBuffers, size_t maxMemory,
-                                int priority, int stackSize)
+pixirad::pixirad(const char *portName, const char *commandPortName,
+                 int dataPortNumber, const char *statusPortName,
+                 int maxSizeX, int maxSizeY,
+                 int maxBuffers, size_t maxMemory,
+                 int priority, int stackSize)
 
     : ADDriver(portName, 1, NUM_PIXIRAD_PARAMS, maxBuffers, maxMemory,
                0, 0,             /* No interfaces beyond those set in ADDriver.cpp */
@@ -227,22 +237,25 @@ pixirad::pixirad(const char *portName, const char *serverPort,
     int status = asynSuccess;
     const char *functionName = "pixirad";
 
+    this->dataPortNumber = dataPortNumber;
+
     /* Create the epicsEvents for signaling to the Pixirad task when acquisition starts and stops */
     this->startEventId = epicsEventCreate(epicsEventEmpty);
     if (!this->startEventId) {
-        printf("%s:%s epicsEventCreate failure for start event\n", 
+        printf("%s:%s: epicsEventCreate failure for start event\n", 
             driverName, functionName);
         return;
     }
     this->stopEventId = epicsEventCreate(epicsEventEmpty);
     if (!this->stopEventId) {
-        printf("%s:%s epicsEventCreate failure for stop event\n", 
+        printf("%s:%s: epicsEventCreate failure for stop event\n", 
             driverName, functionName);
         return;
     }
     
-    /* Connect to Pixirad server */
-    status = pasynOctetSyncIO->connect(serverPort, 0, &this->pasynUserServer, NULL);
+    /* Connect to Pixirad servers */
+    status = pasynOctetSyncIO->connect(commandPortName, 0, &this->pasynUserCommand, NULL);
+    status = pasynOctetSyncIO->connect(statusPortName, 0, &this->pasynUserStatus, NULL);
 
     createParam(PixiradCollectionModeString,  asynParamInt32,   &PixiradCollectionMode);
     createParam(PixiradSaveDataString,        asynParamInt32,   &PixiradSaveData);
@@ -256,6 +269,7 @@ pixirad::pixirad(const char *portName, const char *serverPort,
     createParam(PixiradHVDelayString,         asynParamFloat64, &PixiradHVDelay);
     createParam(PixiradSyncInPolarityString,  asynParamInt32,   &PixiradSyncInPolarity);
     createParam(PixiradSyncOutPolarityString, asynParamInt32,   &PixiradSyncOutPolarity);
+    createParam(PixiradSyncOutFunctionString, asynParamInt32,   &PixiradSyncOutFunction);
     createParam(PixiradDownloadSpeedString,   asynParamInt32,   &PixiradDownloadSpeed);
     createParam(PixiradImageFileTmotString,   asynParamFloat64, &PixiradImageFileTmot);
     createParam(PixiradCoolingStateString,    asynParamInt32,   &PixiradCoolingState);
@@ -275,27 +289,43 @@ pixirad::pixirad(const char *portName, const char *serverPort,
     status |= setIntegerParam(NDArraySizeX, maxSizeX);
     status |= setIntegerParam(NDArraySizeY, maxSizeY);
     status |= setIntegerParam(NDArraySize, 0);
-    status |= setIntegerParam(NDDataType,  NDUInt32);
+    status |= setIntegerParam(NDDataType,  NDUInt16);
+    status |= setIntegerParam(ADNumImages, 1);
     status |= setIntegerParam(ADImageMode, ADImageContinuous);
     status |= setIntegerParam(ADTriggerMode, TMInternal);
     status |= setDoubleParam(ADAcquireTime, 1.0);
+    status |= setDoubleParam(ADAcquirePeriod, 1.0);
+    status |= setDoubleParam(ADTemperature, 20.0);
+    status |= setIntegerParam(PixiradCoolingState, 0);
+    status |= setDoubleParam(PixiradHVValue, 200.0);
+    status |= setIntegerParam(PixiradHVState, HVOff);
+    status |= setIntegerParam(PixiradHVMode, HVAuto);
+    status |= setIntegerParam(PixiradDownloadSpeed, SpeedHigh);
+    status |= setDoubleParam(PixiradThreshold1, 10.0);
+    status |= setDoubleParam(PixiradThreshold2, 15.0);
+    status |= setDoubleParam(PixiradThreshold3, 20.0);
+    status |= setDoubleParam(PixiradThreshold4, 25.0);
+    status |= setIntegerParam(PixiradCollectionMode, CMOneColorLow);
+    status |= setIntegerParam(PixiradSyncInPolarity, SyncPos);
+    status |= setIntegerParam(PixiradSyncOutPolarity, SyncPos);
+    status |= setIntegerParam(PixiradSyncOutFunction, SyncOutShutter);
 
     if (status) {
-        printf("%s: unable to set camera parameters\n", functionName);
+        printf("%s:%s: unable to set camera parameters\n", driverName, functionName);
         return;
     }
     
-    /* Create the thread that updates the images */
-    status = (epicsThreadCreate("PixiradTask",
-                                epicsThreadPriorityMedium,
-                                epicsThreadGetStackSize(epicsThreadStackMedium),
-                                (EPICSTHREADFUNC)pixiradTaskC,
-                                this) == NULL);
-    if (status) {
-        printf("%s:%s epicsThreadCreate failure for image task\n", 
-            driverName, functionName);
-        return;
-    }
+    /* Create the thread that receives status broadcasts for temperature, etc. */
+    epicsThreadCreate("PixiradStatusTask",
+                       epicsThreadPriorityMedium,
+                       epicsThreadGetStackSize(epicsThreadStackMedium),
+                       (EPICSTHREADFUNC)statusTaskC, this);
+
+    /* Create the thread that listens for connections on the data port */
+    epicsThreadCreate("PixiradDataTask",
+                       epicsThreadPriorityMedium,
+                       epicsThreadGetStackSize(epicsThreadStackMedium),
+                       (EPICSTHREADFUNC)dataPortListenerTaskC, this);
 
 }
 
@@ -305,6 +335,7 @@ asynStatus pixirad::setCoolingAndHV()
     int coolingState;
     double HVValue;
     int HVState;
+    asynStatus status;
     
     getDoubleParam(ADTemperature, &coolingValue);
     getIntegerParam(PixiradCoolingState, &coolingState);
@@ -314,17 +345,39 @@ asynStatus pixirad::setCoolingAndHV()
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
                   "DAQ:!INIT %f %d %f %d", 
                   coolingValue, coolingState, HVValue, HVState);
-    writeReadServer(1.0);
+    status = writeReadServer(1.0);
+    return status;
 }
     
-
+asynStatus pixirad::setSync()
+{
+    int syncInPolarity;
+    int syncOutPolarity;
+    int syncOutFunction;
+    asynStatus status;
+    
+    getIntegerParam(PixiradSyncInPolarity, &syncInPolarity);
+    getIntegerParam(PixiradSyncOutPolarity, &syncOutPolarity);
+    getIntegerParam(PixiradSyncOutFunction, &syncOutFunction);
+    
+    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+                  "DAQ:!SET_SYNC %s %s %s", 
+                  PixiradSyncPolarityStrings[syncInPolarity],
+                  PixiradSyncPolarityStrings[syncOutPolarity],
+                  PixiradSyncOutFunctionStrings[syncOutFunction]);
+    status = writeReadServer(1.0);
+    return status;
+}
+    
 asynStatus pixirad::setThresholds()
 {
     double thresholdEnergy[4];
     double actualThresholdEnergy[4];
     int thresholdReg[4];
-    int vthMax, ref=2, autoFS=7;
-    char *dtf, *nbi;
+    int i, vthMax, ref=2, auFS=7;
+    int collectionMode;
+    asynStatus status;
+    const char *dtf, *nbi;
     
     getIntegerParam(PixiradCollectionMode, &collectionMode);
     
@@ -345,14 +398,66 @@ asynStatus pixirad::setThresholds()
     vthMax = 1500;
     
     for (i=0; i<4; i++) {
-        thresholdReg[i] = thresholdEnergy[i];
+        thresholdReg[i] = (int) thresholdEnergy[i];
+        actualThresholdEnergy[i] = thresholdReg[i];
     }
+    
+    setDoubleParam(PixiradThreshold1, actualThresholdEnergy[0]);
+    setDoubleParam(PixiradThreshold2, actualThresholdEnergy[1]);
+    setDoubleParam(PixiradThreshold3, actualThresholdEnergy[2]);
+    setDoubleParam(PixiradThreshold4, actualThresholdEnergy[3]);
     
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
                   "DAQ:!SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
                   thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
                   vthMax, ref, auFS, dtf, nbi);
-    writeReadServer(1.0);
+    status = writeReadServer(1.0);
+    return status;
+}
+    
+asynStatus pixirad::startAcquire()
+{
+    int numImages;
+    double acquireTime;
+    double acquirePeriod;
+    double shutterPause;
+    int collectionMode;
+    int triggerMode;
+    int downloadSpeed;
+    int HVMode;
+    asynStatus status;
+    
+    getIntegerParam(ADNumImages, &numImages);
+    getDoubleParam(ADAcquireTime, &acquireTime);
+    getDoubleParam(ADAcquirePeriod, &acquirePeriod);
+    shutterPause = acquirePeriod - acquireTime;
+    if (shutterPause < 0.) shutterPause = 0;
+    getIntegerParam(PixiradCollectionMode, &collectionMode);
+    getIntegerParam(ADTriggerMode, &triggerMode);
+    getIntegerParam(PixiradDownloadSpeed, &downloadSpeed);
+    getIntegerParam(PixiradHVMode, &HVMode);
+   
+    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+                  "DAQ:!LOOP %d %d %d, %s, %s, %s, %s",
+                  numImages, 
+                  (int)(acquireTime*1000),
+                  int(shutterPause*1000),
+                  PixiradCollectionModeStrings[collectionMode],
+                  PixiradTriggerModeStrings[triggerMode],
+                  PixiradDownloadSpeedStrings[downloadSpeed],
+                  PixiradHVModeStrings[HVMode]);
+    status = writeReadServer(1.0);
+    return status;
+}
+    
+asynStatus pixirad::stopAcquire()
+{
+    asynStatus status;
+    
+    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+                  "DAQ:!!ACQUISITIONBREAK");
+    status = writeReadServer(1.0);
+    return status;
 }
     
 
@@ -360,7 +465,7 @@ asynStatus pixirad::writeReadServer(double timeout)
 {
     size_t nwrite, nread;
     asynStatus status=asynSuccess;
-    asynUser *pasynUser = this->pasynUserServer;
+    asynUser *pasynUser = this->pasynUserCommand;
     int eomReason;
     const char *functionName="writeReadServer";
 
@@ -391,171 +496,148 @@ asynStatus pixirad::writeReadServer(double timeout)
     return(status);
 }
 
-/** This thread controls acquisition, reads image files to get the image data, and
-  * does the callbacks to send it to higher layers */
-void pixirad::pixiradTask()
+
+void pixirad::dataPortListenerTask()
 {
-    int status = asynSuccess;
-    int numImages;
-    int acquire;
-    ADStatus_t acquiring;
-    double acquireTime, acquirePeriod;
-    double readImageFileTimeout, timeout;
-    int triggerMode;
-    epicsTimeStamp startTime;
-    char fullFileName[MAX_FILENAME_LEN];
-    int aborted = 0;
-    int statusParam = 0;
-    static const char *functionName = "pixiradTask";
+ /*
+  * This is the thread that listens for connections from the udp_client.exe.
+  */
+    struct sockaddr_in clientAddr;
+    int clientFd;
+    osiSocklen_t clientLen=sizeof(clientAddr);
+    int socketType = SOCK_STREAM;
+    int i;
+    SOCKET fd;
+    struct sockaddr_in serverAddr;
+    static const char *functionName = "dataPortListener";
 
-    this->lock();
+    if (osiSockAttach() == 0) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+            "%s:%s: osiSockAttach failed\n",
+            driverName, functionName);
+        return;
+    }
 
-    /* Loop forever */
+    // Create the socket
+    if ((fd = epicsSocketCreate(PF_INET, socketType, 0)) < 0) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+            "%s:%s: Can't create socket: %s\n", 
+            driverName, functionName, strerror(SOCKERRNO));
+        return;
+    }
+
+    epicsSocketEnableAddressReuseDuringTimeWaitState(fd);
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_port = htons(dataPortNumber);
+    if (bind(fd, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
+    {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+            "%s:%s: Error in binding port %d: %s\n", 
+            driverName, functionName, dataPortNumber, strerror(errno));
+        epicsSocketDestroy(fd);
+        return;
+    }
+
+    // Enable listening on this port
+    i = listen(fd, 1);
+    if (i < 0) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+            "%s:%s: Error calling listen() on port %d:  %s\n",
+            driverName, functionName, dataPortNumber, strerror(errno));
+        epicsSocketDestroy(fd);
+        return;
+    }
+
+    asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
+              "%s:%s: started listening for connections on port %d\n", 
+              driverName, functionName, dataPortNumber);
     while (1) {
-        /* Is acquisition active? */
-        getIntegerParam(ADAcquire, &acquire);
-
-        /* If we are not acquiring then wait for a semaphore that is given when acquisition is started */
-        if ((aborted) || (!acquire)) {
-            /* Only set the status message if we didn't encounter any errors last time, so we don't overwrite the 
-             error message */
-            if (!status)
-            setStringParam(ADStatusMessage, "Waiting for acquire command");
-            callParamCallbacks();
-            /* Release the lock while we wait for an event that says acquire has started, then lock again */
-            this->unlock();
-            asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, 
-                "%s:%s: waiting for acquire to start\n", driverName, functionName);
-            status = epicsEventWait(this->startEventId);
-            this->lock();
-            aborted = 0;
-            acquire = 1;
-        }
-        
-        /* We are acquiring. */
-        /* Get the current time */
-        epicsTimeGetCurrent(&startTime);
-        
-        /* Get the exposure parameters */
-        getDoubleParam(ADAcquireTime, &acquireTime);
-        getDoubleParam(ADAcquirePeriod, &acquirePeriod);
-        getDoubleParam(PixiradImageFileTmot, &readImageFileTimeout);
-        
-        /* Get the acquisition parameters */
-        getIntegerParam(ADTriggerMode, &triggerMode);
-        getIntegerParam(ADNumImages, &numImages);
-        
-        acquiring = ADStatusAcquire;
-        setIntegerParam(ADStatus, acquiring);
-
-        /* Create the full filename */
-        createFileName(sizeof(fullFileName), fullFileName);
-        setStringParam(NDFullFileName, fullFileName);
-        
-         /* Send the file path to server */
-        epicsSnprintf(this->toServer, sizeof(this->toServer), 
-                      "SET_FILE_PATH %s", fullFileName);
-        writeReadServer(1.0);
-        
-        setStringParam(ADStatusMessage, "Starting exposure");
-        /* Send the acquire command to server */
-        epicsSnprintf(this->toServer, sizeof(this->toServer), 
-                      "START_ACQUISITION");
-        writeReadServer(1.0);
-
-        /* Open the shutter */
-        setShutter(1);
-        callParamCallbacks();
-        
-        // This thread just waits for the ACQUISITION_DONE reply
-        
-
-        setStringParam(ADStatusMessage, "Waiting for ACQUISITION_DONE response");
-        callParamCallbacks();
-        timeout = (numImages * acquirePeriod) + SERVER_ACQUIRE_TIMEOUT;
-        if (status) {
+        clientFd = epicsSocketAccept(fd, (struct sockaddr *)&clientAddr, &clientLen);
+        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
+                  "%s:%s new connection, socket=%d on port %d\n", 
+                  driverName, functionName, clientFd, dataPortNumber);
+        if (clientFd < 0) {
             asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-                "%s:%s: error wating for ACQUISITION_DONE response from server, status=%d\n",
-                driverName, functionName, status);
-            if(status==asynTimeout) {
-                setStringParam(ADStatusMessage, "Timeout waiting for server response");
-                epicsSnprintf(this->toServer, sizeof(this->toServer), "STOP_ACQUISITION");
-                writeReadServer(SERVER_DEFAULT_TIMEOUT);
-                aborted = 1;
-            }
+                      "%s:%s: accept error on port %d: fd=%d, %s\n", 
+                      driverName, functionName, dataPortNumber,
+                      fd, strerror(errno));
+            continue;
         }
-
-        /* If everything was ok, set the status back to idle */
-        getIntegerParam(ADStatus, &statusParam);
-        if (!status) {
-            setIntegerParam(ADStatus, ADStatusIdle);
-        } else {
-            if (statusParam != ADStatusAborted) {
-                setIntegerParam(ADStatus, ADStatusError);
-            }
-        }
-
-        /* Call the callbacks to update any changes */
-        callParamCallbacks();
-
-        setShutter(0);
-        setIntegerParam(ADAcquire, 0);
-
-        /* Call the callbacks to update any changes */
-        callParamCallbacks();        
     }
 }
 
-/** This function is called periodically read the environmental parameters (temperature, humidity, etc.)
-    It should not be called if we are acquiring data, to avoid polling server when taking data.*/
-asynStatus pixirad::pixiradStatus()
+
+/** This function reads the environmental parameters (temperature, humidity, etc.)
+    which are periodically broadcast by the Pixirad box */
+void pixirad::statusTask()
 {
   asynStatus status = asynSuccess;
-  int numItems;
+  int numItems=0;
+  size_t nRead;
+  int eomReason;
   float value;
+  double timeout = -1;  // Wait forever
+  char buffer[256];
+  static const char *functionName = "statusTask";
 
-  /* Read cold temperature */
-  epicsSnprintf(this->toServer, sizeof(this->toServer), "READ_COLD_TEMP");
-  status=writeReadServer(1.0);
-  if (status) return status;
-  numItems = sscanf(this->fromServer, "READ_COLD_TEMP: DONE: %f", &value);
-  if (numItems != 1) return asynError;
-  setDoubleParam(ADTemperatureActual, value);
+  lock();
+  while (1) {
+    unlock();
+    status = pasynOctetSyncIO->read(pasynUserStatus, buffer, sizeof(buffer), timeout, &nRead, &eomReason);
+    lock();
+    if (status) {
+      asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+        "%s:%s: error reading status broadcast message, status=%d\n",
+        driverName, functionName, status);
+      epicsThreadSleep(1.0);
+      continue;
+    }
 
-  /* Read hot temperature */
-  epicsSnprintf(this->toServer, sizeof(this->toServer), "READ_HOT_TEMP");
-  status=writeReadServer(1.0);
-  if (status) return status;
-  numItems = sscanf(this->fromServer, "READ_HOT_TEMP: DONE: %f", &value);
-  if (numItems != 1) return asynError;
-  setDoubleParam(PixiradHotTemperature, value);
+    if (strstr("COLD_TEMP", buffer)) {
+      /* Read cold temperature */
+      numItems = sscanf(buffer, "COLD_TEMP: %f", &value);
+      if (numItems != 1) goto done;
+      setDoubleParam(ADTemperatureActual, value);
+    }
 
-  /* Read box temperature */
-  epicsSnprintf(this->toServer, sizeof(this->toServer), "READ_BOX_TEMP");
-  status=writeReadServer(1.0);
-  if (status) return status;
-  numItems = sscanf(this->fromServer, "READ_BOX_TEMP: DONE: %f", &value);
-  if (numItems != 1) return asynError;
-  setDoubleParam(PixiradBoxTemperature, value);
+    else if (strstr("HOT_TEMP", buffer)) {
+      /* Read hot temperature */
+      numItems = sscanf(buffer, "HOT_TEMP: %f", &value);
+      if (numItems != 1) goto done;
+      setDoubleParam(PixiradHotTemperature, value);
+    }
 
-  /* Read box humidity */
-  epicsSnprintf(this->toServer, sizeof(this->toServer), "READ_BOX_HUM");
-  status=writeReadServer(1.0);
-  if (status) return status;
-  numItems = sscanf(this->fromServer, "READ_BOX_HUM: DONE: %f", &value);
-  if (numItems != 1) return asynError;
-  setDoubleParam(PixiradBoxHumidity, value);
+    else if (strstr("BOX_TEMP", buffer)) {
+      /* Read box temperature */
+      numItems = sscanf(buffer, "BOX_TEMP: %f", &value);
+      if (numItems != 1) goto done;
+      setDoubleParam(PixiradBoxTemperature, value);
+    }
 
-  /* Read Peltier power */
-  epicsSnprintf(this->toServer, sizeof(this->toServer), "READ_PELTIER_PWR");
-  status=writeReadServer(1.0);
-  if (status) return status;
-  numItems = sscanf(this->fromServer, "READ_PELTIER_PWR: DONE: %f", &value);
-  if (numItems != 1) return asynError;
-  setDoubleParam(PixiradPeltierPower, value);
+    else if (strstr("BOX_HUM", buffer)) {
+      /* Read box humidity */
+      numItems = sscanf(buffer, "BOX_HUM: %f", &value);
+      if (numItems != 1) goto done;
+      setDoubleParam(PixiradBoxHumidity, value);
+    }
 
-  callParamCallbacks();
-  return asynSuccess;
+    else if (strstr("PELTIER_PWR", buffer)) {
+      /* Read Peltier power */
+      numItems = sscanf(buffer, "PELTIER_PWR: %f", &value);
+      if (numItems != 1) goto done;
+      setDoubleParam(PixiradPeltierPower, value);
+    }
+    done:
+    if (numItems == 1) {
+      callParamCallbacks();
+    } else {
+      asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+        "%s:%s: error parsing status broadcast message, numItems=%d, message=%s\n",
+        driverName, functionName, numItems, buffer);
+    }
+  }
 }
 
 
@@ -629,8 +711,8 @@ asynStatus pixirad::writeFloat64(asynUser *pasynUser, epicsFloat64 value)
     status = setDoubleParam(function, value);
     
     if ((function == ADTemperature)  ||
-               (function == PixiradHVDelay) ||
-               (function == PixiradHVValue)) {
+        (function == PixiradHVDelay) ||
+        (function == PixiradHVValue)) {
         status = setCoolingAndHV();
 
     } else if ((function == PixiradThreshold1) ||
@@ -682,25 +764,29 @@ void pixirad::report(FILE *fp, int details)
     ADDriver::report(fp, details);
 }
 
-extern "C" int pixiradConfig(const char *portName, const char *serverPort, 
+extern "C" int pixiradConfig(const char *portName, const char *commandPort,
+                                    int dataPortNumber, const char *statusPort,
                                     int maxSizeX, int maxSizeY,
                                     int maxBuffers, size_t maxMemory,
                                     int priority, int stackSize)
 {
-    new pixirad(portName, serverPort, maxSizeX, maxSizeY, maxBuffers, maxMemory,
-                        priority, stackSize);
+    new pixirad(portName, commandPort, dataPortNumber, statusPort, 
+                maxSizeX, maxSizeY, maxBuffers, maxMemory,
+                priority, stackSize);
     return(asynSuccess);
 }
 
 /* Code for iocsh registration */
 static const iocshArg pixiradConfigArg0 = {"Port name", iocshArgString};
-static const iocshArg pixiradConfigArg1 = {"server port name", iocshArgString};
-static const iocshArg pixiradConfigArg2 = {"maxSizeX", iocshArgInt};
-static const iocshArg pixiradConfigArg3 = {"maxSizeY", iocshArgInt};
-static const iocshArg pixiradConfigArg4 = {"maxBuffers", iocshArgInt};
-static const iocshArg pixiradConfigArg5 = {"maxMemory", iocshArgInt};
-static const iocshArg pixiradConfigArg6 = {"priority", iocshArgInt};
-static const iocshArg pixiradConfigArg7 = {"stackSize", iocshArgInt};
+static const iocshArg pixiradConfigArg1 = {"command port name", iocshArgString};
+static const iocshArg pixiradConfigArg2 = {"data port number", iocshArgInt};
+static const iocshArg pixiradConfigArg3 = {"status port name", iocshArgString};
+static const iocshArg pixiradConfigArg4 = {"maxSizeX", iocshArgInt};
+static const iocshArg pixiradConfigArg5 = {"maxSizeY", iocshArgInt};
+static const iocshArg pixiradConfigArg6 = {"maxBuffers", iocshArgInt};
+static const iocshArg pixiradConfigArg7 = {"maxMemory", iocshArgInt};
+static const iocshArg pixiradConfigArg8 = {"priority", iocshArgInt};
+static const iocshArg pixiradConfigArg9 = {"stackSize", iocshArgInt};
 static const iocshArg * const pixiradConfigArgs[] =  {&pixiradConfigArg0,
                                                       &pixiradConfigArg1,
                                                       &pixiradConfigArg2,
@@ -708,12 +794,15 @@ static const iocshArg * const pixiradConfigArgs[] =  {&pixiradConfigArg0,
                                                       &pixiradConfigArg4,
                                                       &pixiradConfigArg5,
                                                       &pixiradConfigArg6,
-                                                      &pixiradConfigArg7};
-static const iocshFuncDef configpixirad = {"pixiradConfig", 8, pixiradConfigArgs};
+                                                      &pixiradConfigArg7,
+                                                      &pixiradConfigArg8,
+                                                      &pixiradConfigArg9};
+static const iocshFuncDef configpixirad = {"pixiradConfig", 10, pixiradConfigArgs};
 static void configpixiradCallFunc(const iocshArgBuf *args)
 {
-    pixiradConfig(args[0].sval, args[1].sval, args[2].ival,  args[3].ival,  
-                  args[4].ival, args[5].ival, args[6].ival,  args[7].ival);
+    pixiradConfig(args[0].sval, args[1].sval, args[2].ival,  args[3].sval,  
+                  args[4].ival, args[5].ival, args[6].ival,  args[7].ival,
+                  args[8].ival, args[9].ival);
 }
 
 
