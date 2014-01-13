@@ -10,6 +10,7 @@ $(P)$(R)HVMode
 $(P)$(R)HVDelay
 $(P)$(R)SyncInPolarity
 $(P)$(R)SyncOutPolarity
+$(P)$(R)SyncOutFunction
 $(P)$(R)DownloadSpeed
 $(P)$(R)ImageFileTmot
 $(P)$(R)CoolingState
