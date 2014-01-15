@@ -269,16 +269,16 @@ record(bo,"$(P)$(R)SyncInPolarity") {
     field(PINI, "YES")
     field(DTYP, "asynInt32")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYNC_IN_POLARITY")
-    field(ZNAM, "Positive")
-    field(ONAM, "Negative")
+    field(ZNAM, "Pos.")
+    field(ONAM, "Neg.")
 }
 
 record(bi,"$(P)$(R)SyncInPolarity_RBV") {
     field(DESC, "Sync in polarity")
     field(DTYP, "asynInt32")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYNC_IN_POLARITY")
-    field(ZNAM, "Positive")
-    field(ONAM, "Negative")
+    field(ZNAM, "Pos.")
+    field(ONAM, "Neg.")
     field(SCAN, "I/O Intr")
 }
 
@@ -287,16 +287,16 @@ record(bo,"$(P)$(R)SyncOutPolarity") {
     field(PINI, "YES")
     field(DTYP, "asynInt32")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYNC_OUT_POLARITY")
-    field(ZNAM, "Positive")
-    field(ONAM, "Negative")
+    field(ZNAM, "Pos.")
+    field(ONAM, "Neg.")
 }
 
 record(bi,"$(P)$(R)SyncOutPolarity_RBV") {
     field(DESC, "Sync out polarity")
     field(DTYP, "asynInt32")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYNC_OUT_POLARITY")
-    field(ZNAM, "Positive")
-    field(ONAM, "Negative")
+    field(ZNAM, "Pos.")
+    field(ONAM, "Neg.")
     field(SCAN, "I/O Intr")
 }
 
@@ -330,16 +330,16 @@ record(bo,"$(P)$(R)DownloadSpeed") {
     field(PINI, "YES")
     field(DTYP, "asynInt32")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))DOWNLOAD_SPEED")
-    field(ZNAM, "Positive")
-    field(ONAM, "Negative")
+    field(ZNAM, "Fast")
+    field(ONAM, "Slow")
 }
 
 record(bi,"$(P)$(R)DownloadSpeed_RBV") {
     field(DESC, "Download speed")
     field(DTYP, "asynInt32")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))DOWNLOAD_SPEED")
-    field(ZNAM, "Positive")
-    field(ONAM, "Negative")
+    field(ZNAM, "Fast")
+    field(ONAM, "Slow")
     field(SCAN, "I/O Intr")
 }
 
@@ -387,6 +387,16 @@ record(ai, "$(P)$(R)BoxHumidity_RBV")
     field(DTYP, "asynFloat64")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))BOX_HUMIDITY")
     field(EGU,  "%")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(ai, "$(P)$(R)DewPoint_RBV")
+{
+    field(DESC, "Detector dew point")
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))DEW_POINT")
+    field(EGU,  "C")
     field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
