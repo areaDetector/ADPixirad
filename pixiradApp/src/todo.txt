@@ -1,0 +1,9 @@
+Fix threshold calculations
+Add SyncOutFunction
+Add HV current
+Get read data working
+Documentation
+Eliminate need for udp_client.exe
+Fix need to restart each time
+
+
