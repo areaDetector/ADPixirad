@@ -17,6 +17,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h>
+#endif
 
 #include <epicsTime.h>
 #include <epicsThread.h>
@@ -125,6 +128,7 @@ static const char *driverName = "pixirad";
 #define PixiradHotTemperatureString  "HOT_TEMPERATURE"
 #define PixiradBoxTemperatureString  "BOX_TEMPERATURE"
 #define PixiradBoxHumidityString     "BOX_HUMIDITY"
+#define PixiradDewPointString        "DEW_POINT"
 #define PixiradPeltierPowerString    "PELTIER_POWER"
 
 
@@ -132,7 +136,7 @@ static const char *driverName = "pixirad";
 class pixirad : public ADDriver {
 public:
     pixirad(const char *portName, const char *commandPortName,
-            int dataPortNumber, const char *statusPortName,
+            int dataPortNumber, int statusPortnumber,
             int maxSizeX, int maxSizeY,
             int maxBuffers, size_t maxMemory,
             int priority, int stackSize);
@@ -166,6 +170,7 @@ protected:
     int PixiradHotTemperature;
     int PixiradBoxTemperature;
     int PixiradBoxHumidity;
+    int PixiradDewPoint;
     int PixiradPeltierPower;
     #define LAST_PIXIRAD_PARAM PixiradPeltierPower
 
@@ -183,10 +188,10 @@ private:
     epicsEventId startEventId;
     epicsEventId stopEventId;
     int dataPortNumber;
+    int statusPortNumber;
     char toServer[MAX_MESSAGE_SIZE];
     char fromServer[MAX_MESSAGE_SIZE];
     asynUser *pasynUserCommand;
-    asynUser *pasynUserStatus;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
@@ -222,7 +227,7 @@ static void dataPortListenerTaskC(void *drvPvt)
   * \param[in] stackSize The stack size for the asyn port driver thread if ASYN_CANBLOCK is set in asynFlags.
   */
 pixirad::pixirad(const char *portName, const char *commandPortName,
-                 int dataPortNumber, const char *statusPortName,
+                 int dataPortNumber, int statusPortNumber,
                  int maxSizeX, int maxSizeY,
                  int maxBuffers, size_t maxMemory,
                  int priority, int stackSize)
@@ -238,6 +243,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     const char *functionName = "pixirad";
 
     this->dataPortNumber = dataPortNumber;
+    this->statusPortNumber = statusPortNumber;
 
     /* Create the epicsEvents for signaling to the Pixirad task when acquisition starts and stops */
     this->startEventId = epicsEventCreate(epicsEventEmpty);
@@ -253,9 +259,8 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
         return;
     }
     
-    /* Connect to Pixirad servers */
+    /* Connect to Pixirad server */
     status = pasynOctetSyncIO->connect(commandPortName, 0, &this->pasynUserCommand, NULL);
-    status = pasynOctetSyncIO->connect(statusPortName, 0, &this->pasynUserStatus, NULL);
 
     createParam(PixiradCollectionModeString,  asynParamInt32,   &PixiradCollectionMode);
     createParam(PixiradSaveDataString,        asynParamInt32,   &PixiradSaveData);
@@ -276,6 +281,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     createParam(PixiradHotTemperatureString,  asynParamFloat64, &PixiradHotTemperature);
     createParam(PixiradBoxTemperatureString,  asynParamFloat64, &PixiradBoxTemperature);
     createParam(PixiradBoxHumidityString,     asynParamFloat64, &PixiradBoxHumidity);
+    createParam(PixiradDewPointString,        asynParamFloat64, &PixiradDewPoint);
     createParam(PixiradPeltierPowerString,    asynParamFloat64, &PixiradPeltierPower);
 
     /* Set some default values for parameters */
@@ -343,7 +349,7 @@ asynStatus pixirad::setCoolingAndHV()
     getIntegerParam(PixiradHVState, &HVState);
     
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
-                  "DAQ:!INIT %f %d %f %d", 
+                  "DAQ:! INIT %f %d %f %d", 
                   coolingValue, coolingState, HVValue, HVState);
     status = writeReadServer(1.0);
     return status;
@@ -361,7 +367,7 @@ asynStatus pixirad::setSync()
     getIntegerParam(PixiradSyncOutFunction, &syncOutFunction);
     
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
-                  "DAQ:!SET_SYNC %s %s %s", 
+                  "DAQ:! SET_SYNC %s %s %s", 
                   PixiradSyncPolarityStrings[syncInPolarity],
                   PixiradSyncPolarityStrings[syncOutPolarity],
                   PixiradSyncOutFunctionStrings[syncOutFunction]);
@@ -408,7 +414,7 @@ asynStatus pixirad::setThresholds()
     setDoubleParam(PixiradThreshold4, actualThresholdEnergy[3]);
     
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
-                  "DAQ:!SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
+                  "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
                   thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
                   vthMax, ref, auFS, dtf, nbi);
     status = writeReadServer(1.0);
@@ -438,7 +444,7 @@ asynStatus pixirad::startAcquire()
     getIntegerParam(PixiradHVMode, &HVMode);
    
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
-                  "DAQ:!LOOP %d %d %d, %s, %s, %s, %s",
+                  "DAQ:! LOOP %d %d %d %s %s %s %s",
                   numImages, 
                   (int)(acquireTime*1000),
                   int(shutterPause*1000),
@@ -478,8 +484,8 @@ asynStatus pixirad::writeReadServer(double timeout)
                     driverName, functionName, timeout, status, 
                     (unsigned long)nwrite, (unsigned long)nread, this->fromServer);
     else {
-        /* Look for the string ": DONE" in the response */
-        if (!strstr(this->fromServer, ": DONE")) {
+        /* Look for the string "GOT:" in the response */
+        if (!strstr(this->fromServer, "GOT:")) {
             asynPrint(pasynUser, ASYN_TRACE_ERROR,
                       "%s:%s unexpected response from server = %s\n",
                       driverName, functionName, this->fromServer);
@@ -503,14 +509,25 @@ void pixirad::dataPortListenerTask()
   * This is the thread that listens for connections from the udp_client.exe.
   */
     struct sockaddr_in clientAddr;
-    int clientFd;
+    int dataFd;
     osiSocklen_t clientLen=sizeof(clientAddr);
     int socketType = SOCK_STREAM;
     int i;
     SOCKET fd;
     struct sockaddr_in serverAddr;
+    int sizeX, sizeY;
+    size_t dims[2];
+    NDArray *pImage;
+    int imageCounter;
+    int arrayCallbacks;
+    char header[20];
+    int expectedSize;
+    int actualSize;
+    int nRead;
+    epicsTimeStamp startTime;
     static const char *functionName = "dataPortListener";
 
+    lock();
     if (osiSockAttach() == 0) {
         asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
             "%s:%s: osiSockAttach failed\n",
@@ -553,90 +570,186 @@ void pixirad::dataPortListenerTask()
     asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
               "%s:%s: started listening for connections on port %d\n", 
               driverName, functionName, dataPortNumber);
+    
+    getIntegerParam(ADMaxSizeX, &sizeX);
+    getIntegerParam(ADMaxSizeY, &sizeY);
+    dims[0] = sizeX;
+    dims[1] = sizeY;
     while (1) {
-        clientFd = epicsSocketAccept(fd, (struct sockaddr *)&clientAddr, &clientLen);
+        unlock();
+        dataFd = epicsSocketAccept(fd, (struct sockaddr *)&clientAddr, &clientLen);
+        lock();
         asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
                   "%s:%s new connection, socket=%d on port %d\n", 
-                  driverName, functionName, clientFd, dataPortNumber);
-        if (clientFd < 0) {
+                  driverName, functionName, dataFd, dataPortNumber);
+        if (dataFd < 0) {
             asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
                       "%s:%s: accept error on port %d: fd=%d, %s\n", 
                       driverName, functionName, dataPortNumber,
                       fd, strerror(errno));
             continue;
         }
+        getIntegerParam(NDArrayCallbacks, &arrayCallbacks);
+        getIntegerParam(NDArrayCounter, &imageCounter);
+        imageCounter++;
+        setIntegerParam(NDArrayCounter, imageCounter);
+        /* Call the callbacks to update any changes */
+        callParamCallbacks();
+
+        if (arrayCallbacks) {
+            /* Get the current time */
+            epicsTimeGetCurrent(&startTime);
+            /* Get an image buffer from the pool */
+            pImage = this->pNDArrayPool->alloc(2, dims, NDUInt16, 0, NULL);
+            /* We release the mutex when reading image */
+            expectedSize = sizeof(header);
+            unlock();
+            actualSize = recv(dataFd, header, expectedSize, 0); 
+            expectedSize = sizeX * sizeY * 2;
+            actualSize = 0;
+            while (actualSize < expectedSize) {
+              nRead = recv(dataFd, (char *)pImage->pData + actualSize, expectedSize-actualSize, 0);
+              if (nRead < 0) break;
+              actualSize += nRead;
+            }
+            lock();
+            /* If there was an error jump to bottom of loop */
+            if (actualSize != expectedSize) {
+                asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+                          "%s:%s: error reading data, expectedSize=%lu, actualSize=%lu\n", 
+                          driverName, functionName, 
+                          (unsigned long)expectedSize, (unsigned long)actualSize);
+                pImage->release();
+                continue;
+            }
+
+            /* Put the frame number and time stamp into the buffer */
+            pImage->uniqueId = imageCounter;
+            pImage->timeStamp = startTime.secPastEpoch + startTime.nsec / 1.e9;
+            updateTimeStamp(&pImage->epicsTS);
+
+            /* Get any attributes that have been defined for this driver */        
+            this->getAttributes(pImage->pAttributeList);
+
+            /* Call the NDArray callback */
+            /* Must release the lock here, or we can get into a deadlock, because we can
+             * block on the plugin lock, and the plugin can be calling us */
+            unlock();
+            asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, 
+                 "%s:%s: calling NDArray callback\n", driverName, functionName);
+            doCallbacksGenericPointer(pImage, NDArrayData, 0);
+            lock();
+            /* Free the image buffer */
+            pImage->release();
+        }
     }
 }
 
 
 /** This function reads the environmental parameters (temperature, humidity, etc.)
-    which are periodically broadcast by the Pixirad box */
+    which are periodically UDP broadcast by the Pixirad box on port 2224 */
 void pixirad::statusTask()
 {
-  asynStatus status = asynSuccess;
+  struct sockaddr_in serverAddr;
+  struct sockaddr_in remoteAddr;
+  osiSocklen_t remoteAddrLen;
+  SOCKET fd;
   int numItems=0;
-  size_t nRead;
-  int eomReason;
+  int nRead;
   float value;
-  double timeout = -1;  // Wait forever
   char buffer[256];
+  double h, temperature, humidity, dewPoint;
+  char *pString;
+  typedef struct {
+    const char* str;
+    int param;
+  } lookupEntry;
+  lookupEntry entry;
+  int i;
+  char format[80];
+  #define MAX_STATUS_PARAMS 5
+  lookupEntry lookupTable[MAX_STATUS_PARAMS] = {
+    {"READ_TCOLD",         ADTemperatureActual},
+    {"READ_THOT",          PixiradHotTemperature},
+    {"READ_BOX_TEMP",      PixiradBoxTemperature},
+    {"READ_BOX_HUM",       PixiradBoxHumidity},
+    {"READ_PELTIER_PWR",   PixiradPeltierPower}
+  };
   static const char *functionName = "statusTask";
 
   lock();
+  if (osiSockAttach() == 0) {
+      asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+          "%s:%s: osiSockAttach failed\n",
+          driverName, functionName);
+      return;
+  }
+
+  // Create the socket
+  if ((fd = epicsSocketCreate(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+      asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+          "%s:%s: Can't create socket: %s\n", 
+          driverName, functionName, strerror(SOCKERRNO));
+      return;
+  }
+
+  serverAddr.sin_family = AF_INET;
+  serverAddr.sin_addr.s_addr = INADDR_ANY;
+  serverAddr.sin_port = htons(statusPortNumber);
+  if (bind(fd, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
+  {
+      asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+          "%s:%s: Error in binding port %d: %s\n", 
+          driverName, functionName, statusPortNumber, strerror(errno));
+      epicsSocketDestroy(fd);
+      return;
+  }
+
   while (1) {
     unlock();
-    status = pasynOctetSyncIO->read(pasynUserStatus, buffer, sizeof(buffer), timeout, &nRead, &eomReason);
+    epicsThreadSleep(1.0);
+    remoteAddrLen = sizeof(remoteAddr);
+    nRead = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr *)&remoteAddr, &remoteAddrLen);
     lock();
-    if (status) {
+
+    if (nRead < 0) {
       asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-        "%s:%s: error reading status broadcast message, status=%d\n",
-        driverName, functionName, status);
-      epicsThreadSleep(1.0);
+        "%s:%s: error reading status broadcast message: %s\n",
+        driverName, functionName, strerror(errno));
       continue;
-    }
 
-    if (strstr("COLD_TEMP", buffer)) {
-      /* Read cold temperature */
-      numItems = sscanf(buffer, "COLD_TEMP: %f", &value);
-      if (numItems != 1) goto done;
-      setDoubleParam(ADTemperatureActual, value);
-    }
-
-    else if (strstr("HOT_TEMP", buffer)) {
-      /* Read hot temperature */
-      numItems = sscanf(buffer, "HOT_TEMP: %f", &value);
-      if (numItems != 1) goto done;
-      setDoubleParam(PixiradHotTemperature, value);
-    }
-
-    else if (strstr("BOX_TEMP", buffer)) {
-      /* Read box temperature */
-      numItems = sscanf(buffer, "BOX_TEMP: %f", &value);
-      if (numItems != 1) goto done;
-      setDoubleParam(PixiradBoxTemperature, value);
-    }
-
-    else if (strstr("BOX_HUM", buffer)) {
-      /* Read box humidity */
-      numItems = sscanf(buffer, "BOX_HUM: %f", &value);
-      if (numItems != 1) goto done;
-      setDoubleParam(PixiradBoxHumidity, value);
-    }
-
-    else if (strstr("PELTIER_PWR", buffer)) {
-      /* Read Peltier power */
-      numItems = sscanf(buffer, "PELTIER_PWR: %f", &value);
-      if (numItems != 1) goto done;
-      setDoubleParam(PixiradPeltierPower, value);
-    }
-    done:
-    if (numItems == 1) {
-      callParamCallbacks();
     } else {
-      asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-        "%s:%s: error parsing status broadcast message, numItems=%d, message=%s\n",
-        driverName, functionName, numItems, buffer);
+      asynPrint(pasynUserSelf, ASYN_TRACEIO_DRIVER,
+        "%s:%s: received status nRead=%d, message=%s\n",
+        driverName, functionName, nRead, buffer);
     }
+
+    for (i=0; i<MAX_STATUS_PARAMS; i++) {
+      entry = lookupTable[i];
+      pString = strstr(buffer, entry.str);
+      if (!pString) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+          "%s:%s: cannot find string %s in status broadcast message=%s\n",
+          driverName, functionName, entry.str, buffer);
+        continue;
+      }
+      sprintf(format, "%s %%f", entry.str);
+      numItems = sscanf(pString, format, &value);
+      if (numItems == 1) {
+        setDoubleParam(entry.param, value);
+      } else {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+          "%s:%s: error parsing %s in status broadcast message=%s\n",
+          driverName, functionName, entry.str, buffer);
+      }
+    }
+    getDoubleParam(PixiradBoxHumidity, &humidity);
+    getDoubleParam(PixiradBoxTemperature, &temperature);
+    // Calculate the dew point (Magnus formula, e-mail from Pixirad 1/14/2014)
+    h = (log10(humidity) - 2.) / 0.4343 + (17.62 * temperature) / (243.12 + temperature);
+    dewPoint = 243.12 * h / (17.62 - h); 
+    setDoubleParam(PixiradDewPoint, dewPoint);
+    callParamCallbacks();
   }
 }
 
@@ -765,12 +878,12 @@ void pixirad::report(FILE *fp, int details)
 }
 
 extern "C" int pixiradConfig(const char *portName, const char *commandPort,
-                                    int dataPortNumber, const char *statusPort,
+                                    int dataPortNumber, int statusPortNumber,
                                     int maxSizeX, int maxSizeY,
                                     int maxBuffers, size_t maxMemory,
                                     int priority, int stackSize)
 {
-    new pixirad(portName, commandPort, dataPortNumber, statusPort, 
+    new pixirad(portName, commandPort, dataPortNumber, statusPortNumber, 
                 maxSizeX, maxSizeY, maxBuffers, maxMemory,
                 priority, stackSize);
     return(asynSuccess);
@@ -780,7 +893,7 @@ extern "C" int pixiradConfig(const char *portName, const char *commandPort,
 static const iocshArg pixiradConfigArg0 = {"Port name", iocshArgString};
 static const iocshArg pixiradConfigArg1 = {"command port name", iocshArgString};
 static const iocshArg pixiradConfigArg2 = {"data port number", iocshArgInt};
-static const iocshArg pixiradConfigArg3 = {"status port name", iocshArgString};
+static const iocshArg pixiradConfigArg3 = {"status port number", iocshArgInt};
 static const iocshArg pixiradConfigArg4 = {"maxSizeX", iocshArgInt};
 static const iocshArg pixiradConfigArg5 = {"maxSizeY", iocshArgInt};
 static const iocshArg pixiradConfigArg6 = {"maxBuffers", iocshArgInt};
@@ -800,7 +913,7 @@ static const iocshArg * const pixiradConfigArgs[] =  {&pixiradConfigArg0,
 static const iocshFuncDef configpixirad = {"pixiradConfig", 10, pixiradConfigArgs};
 static void configpixiradCallFunc(const iocshArgBuf *args)
 {
-    pixiradConfig(args[0].sval, args[1].sval, args[2].ival,  args[3].sval,  
+    pixiradConfig(args[0].sval, args[1].sval, args[2].ival,  args[3].ival,  
                   args[4].ival, args[5].ival, args[6].ival,  args[7].ival,
                   args[8].ival, args[9].ival);
 }
