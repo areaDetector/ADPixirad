@@ -634,7 +634,7 @@ rectangle {
 		x=5
 		y=340
 		width=335
-		height=235
+		height=260
 	}
 	"basic attribute" {
 		clr=14
@@ -1910,4 +1910,32 @@ composite {
 			}
 		}
 	}
+}
+text {
+	object {
+		x=12
+		y=570
+		width=180
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Auto calibrate"
+	align="horiz. right"
+}
+"message button" {
+	object {
+		x=196
+		y=570
+		width=60
+		height=20
+	}
+	control {
+		chan="$(P)$(R)AutoCalibrate"
+		clr=14
+		bclr=51
+	}
+	label="AutoCal"
+	press_msg="1"
 }
