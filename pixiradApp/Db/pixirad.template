@@ -182,6 +182,23 @@ record(ai, "$(P)$(R)Threshold4_RBV")
     field(SCAN, "I/O Intr")
 }
 
+record(bo,"$(P)$(R)AutoCalibrate") {
+    field(DESC, "Auto calibrate")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))AUTO_CALIBRATE")
+    field(ZNAM, "Done")
+    field(ONAM, "Calibrate")
+}
+
+record(bi,"$(P)$(R)AutoCalibrate_RBV") {
+    field(DESC, "Auto calibrate")
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))AUTO_CALIBRATE")
+    field(ZNAM, "Done")
+    field(ONAM, "Calibrate")
+    field(SCAN, "I/O Intr")
+}
+
 record(ao, "$(P)$(R)HVValue")
 {
     field(PINI, "YES")
