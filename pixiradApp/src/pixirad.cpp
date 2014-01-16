@@ -115,6 +115,7 @@ static const char *driverName = "pixirad";
 #define PixiradThreshold2String      "THRESHOLD2"
 #define PixiradThreshold3String      "THRESHOLD3"
 #define PixiradThreshold4String      "THRESHOLD4"
+#define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 #define PixiradHVValueString         "HV_VALUE"
 #define PixiradHVStateString         "HV_STATE"
 #define PixiradHVModeString          "HV_MODE"
@@ -130,6 +131,7 @@ static const char *driverName = "pixirad";
 #define PixiradBoxHumidityString     "BOX_HUMIDITY"
 #define PixiradDewPointString        "DEW_POINT"
 #define PixiradPeltierPowerString    "PELTIER_POWER"
+#define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 
 
 /** Driver for PiXirad pixel array detectors using their server server over TCP/IP socket */
@@ -157,6 +159,7 @@ protected:
     int PixiradThreshold2;
     int PixiradThreshold3;
     int PixiradThreshold4;
+    int PixiradAutoCalibrate;
     int PixiradHVValue;
     int PixiradHVState;
     int PixiradHVMode;
@@ -179,6 +182,7 @@ private:
     asynStatus writeReadServer(double timeout);
     asynStatus setCoolingAndHV();
     asynStatus setThresholds();
+    asynStatus doAutoCalibrate();
     asynStatus setSync();
     asynStatus startAcquire();
     asynStatus stopAcquire();
@@ -268,6 +272,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     createParam(PixiradThreshold2String,      asynParamFloat64, &PixiradThreshold2);
     createParam(PixiradThreshold3String,      asynParamFloat64, &PixiradThreshold3);
     createParam(PixiradThreshold4String,      asynParamFloat64, &PixiradThreshold4);
+    createParam(PixiradAutoCalibrateString,   asynParamInt32,   &PixiradAutoCalibrate);
     createParam(PixiradHVValueString,         asynParamFloat64, &PixiradHVValue);
     createParam(PixiradHVStateString,         asynParamInt32,   &PixiradHVState);
     createParam(PixiradHVModeString,          asynParamInt32,   &PixiradHVMode);
@@ -421,6 +426,16 @@ asynStatus pixirad::setThresholds()
     return status;
 }
     
+asynStatus pixirad::doAutoCalibrate()
+{
+    asynStatus status;
+    
+    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+                  "DAQ:! AUTOCAL");
+    status = writeReadServer(1.0);
+    return status;
+}
+    
 asynStatus pixirad::startAcquire()
 {
     int numImages;
@@ -515,6 +530,8 @@ void pixirad::dataPortListenerTask()
     int i;
     SOCKET fd;
     struct sockaddr_in serverAddr;
+    int numFrames;
+    int collectionMode;
     int sizeX, sizeY;
     size_t dims[2];
     NDArray *pImage;
@@ -577,7 +594,13 @@ void pixirad::dataPortListenerTask()
     dims[1] = sizeY;
     while (1) {
         unlock();
+asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+    "%s:%s: waiting for udp_client socket connection\n",
+    driverName, functionName);
         dataFd = epicsSocketAccept(fd, (struct sockaddr *)&clientAddr, &clientLen);
+asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+    "%s:%s: got udp_client socket connection\n",
+    driverName, functionName);
         lock();
         asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
                   "%s:%s new connection, socket=%d on port %d\n", 
@@ -589,13 +612,15 @@ void pixirad::dataPortListenerTask()
                       fd, strerror(errno));
             continue;
         }
+        getIntegerParam(ADNumImages, &numFrames);
+        getIntegerParam(PixiradCollectionMode, &collectionMode);
         getIntegerParam(NDArrayCallbacks, &arrayCallbacks);
         getIntegerParam(NDArrayCounter, &imageCounter);
         imageCounter++;
         setIntegerParam(NDArrayCounter, imageCounter);
         /* Call the callbacks to update any changes */
         callParamCallbacks();
-
+        
         if (arrayCallbacks) {
             /* Get the current time */
             epicsTimeGetCurrent(&startTime);
@@ -609,8 +634,10 @@ void pixirad::dataPortListenerTask()
             actualSize = 0;
             while (actualSize < expectedSize) {
               nRead = recv(dataFd, (char *)pImage->pData + actualSize, expectedSize-actualSize, 0);
-              if (nRead < 0) break;
               actualSize += nRead;
+asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+    "%s:%s: nRead=%d, actualSize=%d, expectedSize=%d\n", 
+    driverName, functionName, nRead, actualSize, expectedSize);
             }
             lock();
             /* If there was an error jump to bottom of loop */
@@ -642,6 +669,7 @@ void pixirad::dataPortListenerTask()
             /* Free the image buffer */
             pImage->release();
         }
+        epicsSocketDestroy(dataFd);
     }
 }
 
@@ -787,6 +815,9 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
     } else if ((function == PixiradHVState) ||
                (function == PixiradCoolingState)) {
         status = setCoolingAndHV();
+        
+    } else if (function == PixiradAutoCalibrate) {
+        status = doAutoCalibrate();
 
     } else { 
         /* If this parameter belongs to a base class call its method */
