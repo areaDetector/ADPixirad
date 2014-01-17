@@ -8,7 +8,7 @@ display {
 		x=46
 		y=73
 		width=1055
-		height=605
+		height=630
 	}
 	clr=14
 	bclr=4
@@ -634,7 +634,7 @@ rectangle {
 		x=5
 		y=340
 		width=335
-		height=260
+		height=285
 	}
 	"basic attribute" {
 		clr=14
@@ -701,9 +701,9 @@ text {
 }
 text {
 	object {
-		x=42
+		x=22
 		y=395
-		width=150
+		width=170
 		height=20
 	}
 	"basic attribute" {
@@ -724,15 +724,14 @@ text {
 		clr=54
 		bclr=4
 	}
-	align="horiz. centered"
 	limits {
 	}
 }
 text {
 	object {
-		x=42
+		x=22
 		y=420
-		width=150
+		width=170
 		height=20
 	}
 	"basic attribute" {
@@ -753,15 +752,14 @@ text {
 		clr=54
 		bclr=4
 	}
-	align="horiz. centered"
 	limits {
 	}
 }
 text {
 	object {
-		x=42
+		x=22
 		y=445
-		width=150
+		width=170
 		height=20
 	}
 	"basic attribute" {
@@ -782,15 +780,14 @@ text {
 		clr=54
 		bclr=4
 	}
-	align="horiz. centered"
 	limits {
 	}
 }
 text {
 	object {
-		x=42
+		x=22
 		y=470
-		width=150
+		width=170
 		height=20
 	}
 	"basic attribute" {
@@ -811,7 +808,6 @@ text {
 		clr=54
 		bclr=4
 	}
-	align="horiz. centered"
 	limits {
 	}
 }
@@ -861,204 +857,80 @@ text {
 	object {
 		x=22
 		y=495
-		width=170
+		width=160
 		height=20
 	}
 	"basic attribute" {
 		clr=14
 	}
-	textix="Sync In Polarity"
+	textix="Sync in polarity"
 	align="horiz. right"
 }
-"text update" {
-	object {
-		x=260
-		y=496
-		width=60
-		height=18
-	}
-	monitor {
-		chan="$(P)$(R)SyncInPolarity_RBV"
-		clr=54
-		bclr=4
-	}
-	align="horiz. centered"
-	limits {
-	}
-}
-text {
-	object {
-		x=12
-		y=520
-		width=180
-		height=20
-	}
-	"basic attribute" {
-		clr=14
-	}
-	textix="Sync Out Polarity"
-	align="horiz. right"
-}
-"text update" {
-	object {
-		x=260
-		y=521
-		width=60
-		height=18
-	}
-	monitor {
-		chan="$(P)$(R)SyncOutPolarity_RBV"
-		clr=54
-		bclr=4
-	}
-	align="horiz. centered"
-	limits {
-	}
-}
-text {
-	object {
-		x=12
-		y=545
-		width=180
-		height=20
-	}
-	"basic attribute" {
-		clr=14
-	}
-	textix="Download speed"
-	align="horiz. right"
-}
-"text update" {
-	object {
-		x=260
-		y=546
-		width=60
-		height=18
-	}
-	monitor {
-		chan="$(P)$(R)DownloadSpeed_RBV"
-		clr=54
-		bclr=4
-	}
-	align="horiz. centered"
-	limits {
-	}
-}
-composite {
+"text entry" {
 	object {
 		x=196
 		y=395
 		width=60
-		height=170
+		height=20
 	}
-	"composite name"=""
-	children {
-		"text entry" {
-			object {
-				x=196
-				y=395
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)Threshold1"
-				clr=14
-				bclr=51
-			}
-			limits {
-			}
-		}
-		"text entry" {
-			object {
-				x=196
-				y=420
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)Threshold2"
-				clr=14
-				bclr=51
-			}
-			limits {
-			}
-		}
-		"text entry" {
-			object {
-				x=196
-				y=445
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)Threshold3"
-				clr=14
-				bclr=51
-			}
-			limits {
-			}
-		}
-		"text entry" {
-			object {
-				x=196
-				y=470
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)Threshold4"
-				clr=14
-				bclr=51
-			}
-			limits {
-			}
-		}
-		menu {
-			object {
-				x=196
-				y=495
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)SyncInPolarity"
-				clr=14
-				bclr=51
-			}
-		}
-		menu {
-			object {
-				x=196
-				y=520
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)SyncOutPolarity"
-				clr=14
-				bclr=51
-			}
-		}
-		menu {
-			object {
-				x=196
-				y=545
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)DownloadSpeed"
-				clr=14
-				bclr=51
-			}
-		}
+	control {
+		chan="$(P)$(R)Threshold1"
+		clr=14
+		bclr=51
+	}
+	limits {
+	}
+}
+"text entry" {
+	object {
+		x=196
+		y=420
+		width=60
+		height=20
+	}
+	control {
+		chan="$(P)$(R)Threshold2"
+		clr=14
+		bclr=51
+	}
+	limits {
+	}
+}
+"text entry" {
+	object {
+		x=196
+		y=445
+		width=60
+		height=20
+	}
+	control {
+		chan="$(P)$(R)Threshold3"
+		clr=14
+		bclr=51
+	}
+	limits {
+	}
+}
+"text entry" {
+	object {
+		x=196
+		y=470
+		width=60
+		height=20
+	}
+	control {
+		chan="$(P)$(R)Threshold4"
+		clr=14
+		bclr=51
+	}
+	limits {
 	}
 }
 rectangle {
 	object {
-		x=645
-		y=496
-		width=105
+		x=813
+		y=37
+		width=125
 		height=21
 	}
 	"basic attribute" {
@@ -1067,10 +939,10 @@ rectangle {
 }
 rectangle {
 	object {
-		x=345
-		y=490
-		width=705
-		height=110
+		x=700
+		y=35
+		width=350
+		height=155
 	}
 	"basic attribute" {
 		clr=14
@@ -1079,755 +951,315 @@ rectangle {
 }
 text {
 	object {
-		x=619
-		y=496
-		width=157
+		x=815
+		y=38
+		width=120
 		height=20
 	}
 	"basic attribute" {
 		clr=54
 	}
-	textix="Status"
+	textix="High Voltage"
 	align="horiz. centered"
+}
+rectangle {
+	object {
+		x=785
+		y=200
+		width=180
+		height=20
+	}
+	"basic attribute" {
+		clr=2
+	}
 }
 text {
 	object {
-		x=440
-		y=525
+		x=795
+		y=200
+		width=160
+		height=20
+	}
+	"basic attribute" {
+		clr=54
+	}
+	textix="Environmental"
+	align="horiz. centered"
+}
+rectangle {
+	object {
+		x=700
+		y=195
+		width=350
+		height=230
+	}
+	"basic attribute" {
+		clr=14
+		fill="outline"
+	}
+}
+text {
+	object {
+		x=801
+		y=225
 		width=70
 		height=20
 	}
 	"basic attribute" {
 		clr=14
 	}
-	textix="Status:"
+	textix="Cooling"
 	align="horiz. right"
 }
-"text update" {
+menu {
 	object {
-		x=515
-		y=528
-		width=530
-		height=15
+		x=875
+		y=225
+		width=60
+		height=20
 	}
-	monitor {
-		chan="$(P)$(R)StatusMessage_RBV"
+	control {
+		chan="$(P)$(R)CoolingState"
 		clr=14
 		bclr=51
 	}
-	format="string"
+}
+"text update" {
+	object {
+		x=940
+		y=226
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)CoolingState_RBV"
+		clr=54
+		bclr=4
+	}
 	limits {
 	}
 }
 text {
 	object {
-		x=380
-		y=550
-		width=130
+		x=791
+		y=250
+		width=80
 		height=20
 	}
 	"basic attribute" {
 		clr=14
 	}
-	textix="To server:"
+	textix="Setpoint"
 	align="horiz. right"
 }
-"text update" {
+"text entry" {
 	object {
-		x=515
-		y=553
-		width=530
-		height=15
+		x=875
+		y=250
+		width=60
+		height=20
 	}
-	monitor {
-		chan="$(P)$(R)StringToServer_RBV"
+	control {
+		chan="$(P)$(R)Temperature"
 		clr=14
 		bclr=51
 	}
-	format="string"
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=940
+		y=251
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)Temperature_RBV"
+		clr=54
+		bclr=4
+	}
 	limits {
 	}
 }
 text {
 	object {
-		x=360
-		y=575
-		width=150
+		x=771
+		y=275
+		width=100
 		height=20
 	}
 	"basic attribute" {
 		clr=14
 	}
-	textix="From server:"
+	textix="Cold Temp."
 	align="horiz. right"
 }
 "text update" {
 	object {
-		x=515
-		y=578
-		width=530
-		height=15
+		x=875
+		y=276
+		width=60
+		height=18
 	}
 	monitor {
-		chan="$(P)$(R)StringFromServer_RBV"
-		clr=14
-		bclr=51
+		chan="$(P)$(R)TemperatureActual"
+		clr=54
+		bclr=4
 	}
-	format="string"
+	align="horiz. right"
 	limits {
 	}
 }
-composite {
+"text update" {
 	object {
-		x=700
-		y=35
-		width=350
-		height=130
+		x=875
+		y=301
+		width=60
+		height=18
 	}
-	"composite name"=""
-	children {
-		rectangle {
-			object {
-				x=813
-				y=37
-				width=125
-				height=21
-			}
-			"basic attribute" {
-				clr=2
-			}
-		}
-		rectangle {
-			object {
-				x=700
-				y=35
-				width=350
-				height=130
-			}
-			"basic attribute" {
-				clr=14
-				fill="outline"
-			}
-		}
-		text {
-			object {
-				x=796
-				y=38
-				width=159
-				height=20
-			}
-			"basic attribute" {
-				clr=54
-			}
-			textix="High Voltage"
-			align="horiz. centered"
-		}
-		text {
-			object {
-				x=721
-				y=115
-				width=180
-				height=20
-			}
-			"basic attribute" {
-				clr=14
-			}
-			textix="High voltage value"
-			align="horiz. right"
-		}
-		"text entry" {
-			object {
-				x=905
-				y=115
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)HVValue"
-				clr=14
-				bclr=51
-			}
-			limits {
-			}
-		}
-		"text update" {
-			object {
-				x=969
-				y=116
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)HVValue_RBV"
-				clr=54
-				bclr=4
-			}
-			align="horiz. centered"
-			limits {
-			}
-		}
-		text {
-			object {
-				x=721
-				y=140
-				width=180
-				height=20
-			}
-			"basic attribute" {
-				clr=14
-			}
-			textix="High voltage delay"
-			align="horiz. right"
-		}
-		"text entry" {
-			object {
-				x=905
-				y=140
-				width=60
-				height=20
-			}
-			control {
-				chan="$(P)$(R)HVDelay"
-				clr=14
-				bclr=51
-			}
-			limits {
-			}
-		}
-		"text update" {
-			object {
-				x=969
-				y=141
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)HVDelay_RBV"
-				clr=54
-				bclr=4
-			}
-			align="horiz. centered"
-			limits {
-			}
-		}
-		composite {
-			object {
-				x=721
-				y=65
-				width=308
-				height=46
-			}
-			"composite name"=""
-			children {
-				text {
-					object {
-						x=731
-						y=65
-						width=170
-						height=20
-					}
-					"basic attribute" {
-						clr=14
-					}
-					textix="High voltage mode"
-					align="horiz. right"
-				}
-				menu {
-					object {
-						x=905
-						y=65
-						width=60
-						height=20
-					}
-					control {
-						chan="$(P)$(R)HVMode"
-						clr=14
-						bclr=51
-					}
-				}
-				"text update" {
-					object {
-						x=969
-						y=66
-						width=60
-						height=18
-					}
-					monitor {
-						chan="$(P)$(R)HVMode_RBV"
-						clr=54
-						bclr=4
-					}
-					align="horiz. centered"
-					limits {
-					}
-				}
-				text {
-					object {
-						x=721
-						y=91
-						width=180
-						height=20
-					}
-					"basic attribute" {
-						clr=14
-					}
-					textix="High voltage state"
-					align="horiz. right"
-				}
-				menu {
-					object {
-						x=905
-						y=91
-						width=60
-						height=20
-					}
-					control {
-						chan="$(P)$(R)HVState"
-						clr=14
-						bclr=51
-					}
-				}
-				"text update" {
-					object {
-						x=969
-						y=92
-						width=60
-						height=18
-					}
-					monitor {
-						chan="$(P)$(R)HVState_RBV"
-						clr=54
-						bclr=4
-					}
-					align="horiz. centered"
-					limits {
-					}
-				}
-			}
-		}
+	monitor {
+		chan="$(P)$(R)HotTemperature_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
 	}
 }
-composite {
+text {
 	object {
-		x=700
-		y=170
-		width=350
-		height=230
+		x=781
+		y=300
+		width=90
+		height=20
 	}
-	"composite name"=""
-	children {
-		rectangle {
-			object {
-				x=785
-				y=175
-				width=180
-				height=20
-			}
-			"basic attribute" {
-				clr=2
-			}
-		}
-		text {
-			object {
-				x=795
-				y=175
-				width=160
-				height=20
-			}
-			"basic attribute" {
-				clr=54
-			}
-			textix="Environmental"
-			align="horiz. centered"
-		}
-		rectangle {
-			object {
-				x=700
-				y=170
-				width=350
-				height=230
-			}
-			"basic attribute" {
-				clr=14
-				fill="outline"
-			}
-		}
-		composite {
-			object {
-				x=751
-				y=200
-				width=249
-				height=195
-			}
-			"composite name"=""
-			children {
-				composite {
-					object {
-						x=801
-						y=200
-						width=199
-						height=20
-					}
-					"composite name"=""
-					children {
-						text {
-							object {
-								x=801
-								y=200
-								width=70
-								height=20
-							}
-							"basic attribute" {
-								clr=14
-							}
-							textix="Cooling"
-							align="horiz. right"
-						}
-						menu {
-							object {
-								x=875
-								y=200
-								width=60
-								height=20
-							}
-							control {
-								chan="$(P)$(R)CoolingState"
-								clr=14
-								bclr=51
-							}
-						}
-						"text update" {
-							object {
-								x=940
-								y=201
-								width=60
-								height=18
-							}
-							monitor {
-								chan="$(P)$(R)CoolingState_RBV"
-								clr=54
-								bclr=4
-							}
-							align="horiz. centered"
-							limits {
-							}
-						}
-					}
-				}
-				composite {
-					object {
-						x=791
-						y=225
-						width=209
-						height=20
-					}
-					"composite name"=""
-					children {
-						text {
-							object {
-								x=791
-								y=225
-								width=80
-								height=20
-							}
-							"basic attribute" {
-								clr=14
-							}
-							textix="Setpoint"
-							align="horiz. right"
-						}
-						"text entry" {
-							object {
-								x=875
-								y=225
-								width=60
-								height=20
-							}
-							control {
-								chan="$(P)$(R)Temperature"
-								clr=14
-								bclr=51
-							}
-							limits {
-							}
-						}
-						"text update" {
-							object {
-								x=940
-								y=226
-								width=60
-								height=18
-							}
-							monitor {
-								chan="$(P)$(R)Temperature_RBV"
-								clr=54
-								bclr=4
-							}
-							align="horiz. centered"
-							limits {
-							}
-						}
-					}
-				}
-				composite {
-					object {
-						x=771
-						y=250
-						width=164
-						height=20
-					}
-					"composite name"=""
-					children {
-						text {
-							object {
-								x=771
-								y=250
-								width=100
-								height=20
-							}
-							"basic attribute" {
-								clr=14
-							}
-							textix="Cold Temp."
-							align="horiz. right"
-						}
-						"text update" {
-							object {
-								x=875
-								y=251
-								width=60
-								height=18
-							}
-							monitor {
-								chan="$(P)$(R)TemperatureActual"
-								clr=54
-								bclr=4
-							}
-							align="horiz. centered"
-							limits {
-							}
-						}
-					}
-				}
-				composite {
-					object {
-						x=781
-						y=275
-						width=154
-						height=20
-					}
-					"composite name"=""
-					children {
-						"text update" {
-							object {
-								x=875
-								y=276
-								width=60
-								height=18
-							}
-							monitor {
-								chan="$(P)$(R)HotTemperature_RBV"
-								clr=54
-								bclr=4
-							}
-							align="horiz. centered"
-							limits {
-							}
-						}
-						text {
-							object {
-								x=781
-								y=275
-								width=90
-								height=20
-							}
-							"basic attribute" {
-								clr=14
-							}
-							textix="Hot Temp."
-							align="horiz. right"
-						}
-					}
-				}
-				composite {
-					object {
-						x=751
-						y=300
-						width=185
-						height=95
-					}
-					"composite name"=""
-					children {
-						composite {
-							object {
-								x=751
-								y=375
-								width=185
-								height=20
-							}
-							"composite name"=""
-							children {
-								text {
-									object {
-										x=751
-										y=375
-										width=120
-										height=20
-									}
-									"basic attribute" {
-										clr=14
-									}
-									textix="Peltier power"
-									align="horiz. right"
-								}
-								"text update" {
-									object {
-										x=876
-										y=376
-										width=60
-										height=18
-									}
-									monitor {
-										chan="$(P)$(R)PeltierPower_RBV"
-										clr=54
-										bclr=4
-									}
-									align="horiz. centered"
-									limits {
-									}
-								}
-							}
-						}
-						composite {
-							object {
-								x=782
-								y=300
-								width=154
-								height=20
-							}
-							"composite name"=""
-							children {
-								text {
-									object {
-										x=782
-										y=300
-										width=90
-										height=20
-									}
-									"basic attribute" {
-										clr=14
-									}
-									textix="Box Temp."
-									align="horiz. right"
-								}
-								"text update" {
-									object {
-										x=876
-										y=301
-										width=60
-										height=18
-									}
-									monitor {
-										chan="$(P)$(R)BoxTemperature_RBV"
-										clr=54
-										bclr=4
-									}
-									align="horiz. centered"
-									limits {
-									}
-								}
-							}
-						}
-						composite {
-							object {
-								x=751
-								y=325
-								width=185
-								height=20
-							}
-							"composite name"=""
-							children {
-								text {
-									object {
-										x=751
-										y=325
-										width=120
-										height=20
-									}
-									"basic attribute" {
-										clr=14
-									}
-									textix="Box humidity"
-									align="horiz. right"
-								}
-								"text update" {
-									object {
-										x=876
-										y=326
-										width=60
-										height=18
-									}
-									monitor {
-										chan="$(P)$(R)BoxHumidity_RBV"
-										clr=54
-										bclr=4
-									}
-									align="horiz. centered"
-									limits {
-									}
-								}
-							}
-						}
-						composite {
-							object {
-								x=751
-								y=350
-								width=185
-								height=20
-							}
-							"composite name"=""
-							children {
-								text {
-									object {
-										x=751
-										y=350
-										width=120
-										height=20
-									}
-									"basic attribute" {
-										clr=14
-									}
-									textix="Dew point"
-									align="horiz. right"
-								}
-								"text update" {
-									object {
-										x=876
-										y=351
-										width=60
-										height=18
-									}
-									monitor {
-										chan="$(P)$(R)DewPoint_RBV"
-										clr=54
-										bclr=4
-									}
-									align="horiz. centered"
-									limits {
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Hot Temp."
+	align="horiz. right"
+}
+text {
+	object {
+		x=751
+		y=400
+		width=120
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Peltier power"
+	align="horiz. right"
+}
+"text update" {
+	object {
+		x=876
+		y=401
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)PeltierPower_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
+	}
+}
+text {
+	object {
+		x=782
+		y=325
+		width=90
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Box Temp."
+	align="horiz. right"
+}
+"text update" {
+	object {
+		x=876
+		y=326
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)BoxTemperature_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
+	}
+}
+text {
+	object {
+		x=751
+		y=350
+		width=120
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Box humidity"
+	align="horiz. right"
+}
+"text update" {
+	object {
+		x=876
+		y=351
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)BoxHumidity_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
+	}
+}
+text {
+	object {
+		x=751
+		y=375
+		width=120
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Dew point"
+	align="horiz. right"
+}
+"text update" {
+	object {
+		x=876
+		y=376
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)DewPoint_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
 	}
 }
 composite {
 	object {
 		x=699
-		y=405
+		y=430
 		width=350
 		height=60
 	}
@@ -1836,7 +1268,7 @@ composite {
 		composite {
 			object {
 				x=823
-				y=407
+				y=432
 				width=102
 				height=21
 			}
@@ -1845,7 +1277,7 @@ composite {
 				rectangle {
 					object {
 						x=823
-						y=407
+						y=432
 						width=102
 						height=21
 					}
@@ -1858,7 +1290,7 @@ composite {
 		text {
 			object {
 				x=855
-				y=407
+				y=432
 				width=38
 				height=20
 			}
@@ -1871,7 +1303,7 @@ composite {
 		rectangle {
 			object {
 				x=699
-				y=405
+				y=430
 				width=350
 				height=60
 			}
@@ -1883,7 +1315,7 @@ composite {
 		text {
 			object {
 				x=711
-				y=434
+				y=459
 				width=38
 				height=20
 			}
@@ -1896,7 +1328,7 @@ composite {
 		"text entry" {
 			object {
 				x=755
-				y=435
+				y=460
 				width=285
 				height=20
 			}
@@ -1913,9 +1345,22 @@ composite {
 }
 text {
 	object {
-		x=12
+		x=42
 		y=570
-		width=180
+		width=140
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Download speed"
+	align="horiz. right"
+}
+text {
+	object {
+		x=42
+		y=595
+		width=140
 		height=20
 	}
 	"basic attribute" {
@@ -1926,9 +1371,9 @@ text {
 }
 "message button" {
 	object {
-		x=196
-		y=570
-		width=60
+		x=186
+		y=595
+		width=80
 		height=20
 	}
 	control {
@@ -1938,4 +1383,631 @@ text {
 	}
 	label="AutoCal"
 	press_msg="1"
+}
+text {
+	object {
+		x=12
+		y=520
+		width=170
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Sync out polarity"
+	align="horiz. right"
+}
+text {
+	object {
+		x=12
+		y=545
+		width=170
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Sync out function"
+	align="horiz. right"
+}
+composite {
+	object {
+		x=345
+		y=515
+		width=705
+		height=110
+	}
+	"composite name"=""
+	children {
+		rectangle {
+			object {
+				x=645
+				y=521
+				width=105
+				height=21
+			}
+			"basic attribute" {
+				clr=2
+			}
+		}
+		rectangle {
+			object {
+				x=345
+				y=515
+				width=705
+				height=110
+			}
+			"basic attribute" {
+				clr=14
+				fill="outline"
+			}
+		}
+		text {
+			object {
+				x=619
+				y=521
+				width=157
+				height=20
+			}
+			"basic attribute" {
+				clr=54
+			}
+			textix="Status"
+			align="horiz. centered"
+		}
+		text {
+			object {
+				x=440
+				y=550
+				width=70
+				height=20
+			}
+			"basic attribute" {
+				clr=14
+			}
+			textix="Status:"
+			align="horiz. right"
+		}
+		"text update" {
+			object {
+				x=515
+				y=553
+				width=530
+				height=15
+			}
+			monitor {
+				chan="$(P)$(R)StatusMessage_RBV"
+				clr=14
+				bclr=51
+			}
+			format="string"
+			limits {
+			}
+		}
+		text {
+			object {
+				x=380
+				y=575
+				width=130
+				height=20
+			}
+			"basic attribute" {
+				clr=14
+			}
+			textix="To server:"
+			align="horiz. right"
+		}
+		"text update" {
+			object {
+				x=515
+				y=578
+				width=530
+				height=15
+			}
+			monitor {
+				chan="$(P)$(R)StringToServer_RBV"
+				clr=14
+				bclr=51
+			}
+			format="string"
+			limits {
+			}
+		}
+		text {
+			object {
+				x=360
+				y=600
+				width=150
+				height=20
+			}
+			"basic attribute" {
+				clr=14
+			}
+			textix="From server:"
+			align="horiz. right"
+		}
+		"text update" {
+			object {
+				x=515
+				y=603
+				width=530
+				height=15
+			}
+			monitor {
+				chan="$(P)$(R)StringFromServer_RBV"
+				clr=14
+				bclr=51
+			}
+			format="string"
+			limits {
+			}
+		}
+	}
+}
+text {
+	object {
+		x=756
+		y=115
+		width=110
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="HV setpoint"
+	align="horiz. right"
+}
+"text entry" {
+	object {
+		x=870
+		y=115
+		width=60
+		height=20
+	}
+	control {
+		chan="$(P)$(R)HVValue"
+		clr=14
+		bclr=51
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=934
+		y=116
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVValue_RBV"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+text {
+	object {
+		x=796
+		y=65
+		width=70
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="HV mode"
+	align="horiz. right"
+}
+menu {
+	object {
+		x=870
+		y=65
+		width=60
+		height=20
+	}
+	control {
+		chan="$(P)$(R)HVMode"
+		clr=14
+		bclr=51
+	}
+}
+"text update" {
+	object {
+		x=934
+		y=66
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVMode_RBV"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+text {
+	object {
+		x=786
+		y=91
+		width=80
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="HV state"
+	align="horiz. right"
+}
+menu {
+	object {
+		x=870
+		y=91
+		width=60
+		height=20
+	}
+	control {
+		chan="$(P)$(R)HVState"
+		clr=14
+		bclr=51
+	}
+}
+"text update" {
+	object {
+		x=934
+		y=92
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVState_RBV"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+text {
+	object {
+		x=786
+		y=140
+		width=80
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="HV value"
+	align="horiz. right"
+}
+"text update" {
+	object {
+		x=870
+		y=141
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVActual_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
+	}
+}
+text {
+	object {
+		x=786
+		y=165
+		width=80
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="HV current"
+	align="horiz. right"
+}
+"text update" {
+	object {
+		x=870
+		y=166
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVCurrent_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=934
+		y=166
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVCurrent_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=934
+		y=141
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVActual_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=940
+		y=276
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)TemperatureActual.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=940
+		y=301
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HotTemperature_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=940
+		y=326
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)BoxTemperature_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=940
+		y=351
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)BoxHumidity_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=940
+		y=376
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)DewPoint_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=940
+		y=401
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)PeltierPower_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+composite {
+	object {
+		x=270
+		y=496
+		width=60
+		height=93
+	}
+	"composite name"=""
+	children {
+		"text update" {
+			object {
+				x=270
+				y=496
+				width=60
+				height=18
+			}
+			monitor {
+				chan="$(P)$(R)SyncInPolarity_RBV"
+				clr=54
+				bclr=4
+			}
+			limits {
+			}
+		}
+		"text update" {
+			object {
+				x=270
+				y=571
+				width=60
+				height=18
+			}
+			monitor {
+				chan="$(P)$(R)DownloadSpeed_RBV"
+				clr=54
+				bclr=4
+			}
+			limits {
+			}
+		}
+		"text update" {
+			object {
+				x=270
+				y=521
+				width=60
+				height=18
+			}
+			monitor {
+				chan="$(P)$(R)SyncOutPolarity_RBV"
+				clr=54
+				bclr=4
+			}
+			limits {
+			}
+		}
+		"text update" {
+			object {
+				x=270
+				y=546
+				width=60
+				height=18
+			}
+			monitor {
+				chan="$(P)$(R)SyncOutFunction_RBV"
+				clr=54
+				bclr=4
+			}
+			limits {
+			}
+		}
+	}
+}
+composite {
+	object {
+		x=186
+		y=495
+		width=80
+		height=95
+	}
+	"composite name"=""
+	children {
+		menu {
+			object {
+				x=186
+				y=495
+				width=80
+				height=20
+			}
+			control {
+				chan="$(P)$(R)SyncInPolarity"
+				clr=14
+				bclr=51
+			}
+		}
+		menu {
+			object {
+				x=186
+				y=570
+				width=80
+				height=20
+			}
+			control {
+				chan="$(P)$(R)DownloadSpeed"
+				clr=14
+				bclr=51
+			}
+		}
+		menu {
+			object {
+				x=186
+				y=520
+				width=80
+				height=20
+			}
+			control {
+				chan="$(P)$(R)SyncOutPolarity"
+				clr=14
+				bclr=51
+			}
+		}
+		menu {
+			object {
+				x=186
+				y=545
+				width=80
+				height=20
+			}
+			control {
+				chan="$(P)$(R)SyncOutFunction"
+				clr=14
+				bclr=51
+			}
+		}
+	}
+}
+"text update" {
+	object {
+		x=999
+		y=116
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)HVValue_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=1005
+		y=251
+		width=20
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)Temperature_RBV.EGU"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
 }
