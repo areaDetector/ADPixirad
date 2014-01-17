@@ -105,7 +105,7 @@ record(ao, "$(P)$(R)Threshold1")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD1")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(VAL, "10.000")
 }
 
@@ -115,7 +115,7 @@ record(ai, "$(P)$(R)Threshold1_RBV")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD1")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
 
@@ -126,7 +126,7 @@ record(ao, "$(P)$(R)Threshold2")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD2")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(VAL, "10.000")
 }
 
@@ -136,7 +136,7 @@ record(ai, "$(P)$(R)Threshold2_RBV")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD2")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
 
@@ -147,7 +147,7 @@ record(ao, "$(P)$(R)Threshold3")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD3")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(VAL, "10.000")
 }
 
@@ -157,7 +157,7 @@ record(ai, "$(P)$(R)Threshold3_RBV")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD3")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
 
@@ -168,7 +168,7 @@ record(ao, "$(P)$(R)Threshold4")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD4")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(VAL, "10.000")
 }
 
@@ -178,7 +178,7 @@ record(ai, "$(P)$(R)Threshold4_RBV")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD4")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
-    field(PREC, "3")
+    field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
 
@@ -261,22 +261,22 @@ record(bi,"$(P)$(R)HVMode_RBV") {
     field(SCAN, "I/O Intr")
 }
 
-record(ao, "$(P)$(R)HVDelay")
+record(ai, "$(P)$(R)HVActual_RBV")
 {
-    field(PINI, "YES")
     field(DTYP, "asynFloat64")
-    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_DELAY")
-    field(DESC, "High voltage delay")
-    field(EGU,  "s")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_ACTUAL")
+    field(DESC, "High voltage actual")
+    field(EGU,  "V")
     field(PREC, "1")
+    field(SCAN, "I/O Intr")
 }
 
-record(ai, "$(P)$(R)HVDelay_RBV")
+record(ai, "$(P)$(R)HVCurrent_RBV")
 {
     field(DTYP, "asynFloat64")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_DELAY")
-    field(DESC, "High voltage delay")
-    field(EGU,  "s")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HV_CURRENT")
+    field(DESC, "High voltage current")
+    field(EGU,  "nA")
     field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
@@ -325,7 +325,7 @@ record(mbbo,"$(P)$(R)SyncOutFunction") {
     field(ZRVL, "0")
     field(ZRST, "Shutter")
     field(ONVL, "1")
-    field(ONST, "Readout done")
+    field(ONST, "Read done")
     field(TWVL, "2")
     field(TWST, "Read")
 }
@@ -337,9 +337,10 @@ record(mbbi,"$(P)$(R)SyncOutFunction_RBV") {
     field(ZRVL, "0")
     field(ZRST, "Shutter")
     field(ONVL, "1")
-    field(ONST, "Readout done")
+    field(ONST, "Read done")
     field(TWVL, "2")
     field(TWST, "Read")
+    field(SCAN, "I/O Intr")
 }
 
 record(bo,"$(P)$(R)DownloadSpeed") {
@@ -437,7 +438,7 @@ record(ao, "$(P)$(R)ImageFileTmot")
     field(DESC, "Timeout for image file")
     field(VAL,  "20")
     field(EGU,  "s")
-    field(PREC, "3")
+    field(PREC, "1")
 }
 
 # asyn record for interactive communication with server
