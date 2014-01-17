@@ -7,7 +7,6 @@ $(P)$(R)Threshold4
 $(P)$(R)HVValue
 $(P)$(R)HVState
 $(P)$(R)HVMode
-$(P)$(R)HVDelay
 $(P)$(R)SyncInPolarity
 $(P)$(R)SyncOutPolarity
 $(P)$(R)SyncOutFunction
