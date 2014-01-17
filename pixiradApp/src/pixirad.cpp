@@ -119,7 +119,8 @@ static const char *driverName = "pixirad";
 #define PixiradHVValueString         "HV_VALUE"
 #define PixiradHVStateString         "HV_STATE"
 #define PixiradHVModeString          "HV_MODE"
-#define PixiradHVDelayString         "HV_DELAY"
+#define PixiradHVActualString        "HV_ACTUAL"
+#define PixiradHVCurrentString       "HV_CURRENT"
 #define PixiradSyncInPolarityString  "SYNC_IN_POLARITY"
 #define PixiradSyncOutPolarityString "SYNC_OUT_POLARITY"
 #define PixiradSyncOutFunctionString "SYNC_OUT_FUNCTION"
@@ -163,7 +164,8 @@ protected:
     int PixiradHVValue;
     int PixiradHVState;
     int PixiradHVMode;
-    int PixiradHVDelay;
+    int PixiradHVActual;
+    int PixiradHVCurrent;
     int PixiradSyncInPolarity;
     int PixiradSyncOutPolarity;
     int PixiradSyncOutFunction;
@@ -276,7 +278,8 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     createParam(PixiradHVValueString,         asynParamFloat64, &PixiradHVValue);
     createParam(PixiradHVStateString,         asynParamInt32,   &PixiradHVState);
     createParam(PixiradHVModeString,          asynParamInt32,   &PixiradHVMode);
-    createParam(PixiradHVDelayString,         asynParamFloat64, &PixiradHVDelay);
+    createParam(PixiradHVActualString,        asynParamFloat64, &PixiradHVActual);
+    createParam(PixiradHVCurrentString,       asynParamFloat64, &PixiradHVCurrent);
     createParam(PixiradSyncInPolarityString,  asynParamInt32,   &PixiradSyncInPolarity);
     createParam(PixiradSyncOutPolarityString, asynParamInt32,   &PixiradSyncOutPolarity);
     createParam(PixiradSyncOutFunctionString, asynParamInt32,   &PixiradSyncOutFunction);
@@ -354,12 +357,12 @@ asynStatus pixirad::setCoolingAndHV()
     getIntegerParam(PixiradHVState, &HVState);
     
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
-                  "DAQ:! INIT %f %d %f %d", 
+                  "DAQ:! INIT %.1f %d %.1f %d", 
                   coolingValue, coolingState, HVValue, HVState);
     status = writeReadServer(1.0);
     return status;
 }
-    
+  
 asynStatus pixirad::setSync()
 {
     int syncInPolarity;
@@ -695,13 +698,15 @@ void pixirad::statusTask()
   lookupEntry entry;
   int i;
   char format[80];
-  #define MAX_STATUS_PARAMS 5
+  #define MAX_STATUS_PARAMS 7
   lookupEntry lookupTable[MAX_STATUS_PARAMS] = {
     {"READ_TCOLD",         ADTemperatureActual},
     {"READ_THOT",          PixiradHotTemperature},
     {"READ_BOX_TEMP",      PixiradBoxTemperature},
     {"READ_BOX_HUM",       PixiradBoxHumidity},
-    {"READ_PELTIER_PWR",   PixiradPeltierPower}
+    {"READ_PELTIER_PWR",   PixiradPeltierPower},
+    {"READ_HV",            PixiradHVActual},
+    {"READ_HV_CURRENT",    PixiradHVCurrent}
   };
   static const char *functionName = "statusTask";
 
@@ -808,13 +813,24 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
             status = stopAcquire();
         }
 
-    } else if ((function == PixiradSyncInPolarity) ||
-               (function == PixiradSyncOutPolarity)) {
+    } else if ((function == PixiradSyncInPolarity)  ||
+               (function == PixiradSyncOutPolarity) ||
+               (function == PixiradSyncOutFunction)) {
         status = setSync();
 
-    } else if ((function == PixiradHVState) ||
-               (function == PixiradCoolingState)) {
-        status = setCoolingAndHV();
+    } else if (function == PixiradHVState) {
+//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
+//                     "SRV:! SET_HV_%s",
+//                      value ? "ON" : "OFF");
+//        status = writeReadServer(1.0);
+          status = setCoolingAndHV();
+    
+    } else if (function == PixiradCoolingState) {
+//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
+//                      "SRV:! SET_TCOLD_MANAGEMENT_%s",
+//                      value ? "ON" : "OFF");
+//        status = writeReadServer(1.0);
+          status = setCoolingAndHV();
         
     } else if (function == PixiradAutoCalibrate) {
         status = doAutoCalibrate();
@@ -854,9 +870,18 @@ asynStatus pixirad::writeFloat64(asynUser *pasynUser, epicsFloat64 value)
      * status at the end, but that's OK */
     status = setDoubleParam(function, value);
     
-    if ((function == ADTemperature)  ||
-        (function == PixiradHVDelay) ||
-        (function == PixiradHVValue)) {
+    if (function == ADTemperature) {
+//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
+//                      "SRV:! SET_TCOLD %d",
+//                      (int) value);
+//        status = writeReadServer(1.0);
+        status = setCoolingAndHV();
+    
+    } else if (function == PixiradHVValue) {
+//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
+//                      "SRV:! SET_HV %d",
+//                      (int) value);
+//        status = writeReadServer(1.0);
         status = setCoolingAndHV();
 
     } else if ((function == PixiradThreshold1) ||
