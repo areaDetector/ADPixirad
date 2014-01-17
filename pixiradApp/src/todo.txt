@@ -1,9 +1,7 @@
 Fix threshold calculations
-Add SyncOutFunction
-Add HV current
-Get read data working
+Get read data working for multiple images
 Documentation
 Eliminate need for udp_client.exe
-Fix need to restart each time
-
-
+Try with DHCP
+Temperature status (OK, DP warning, DP error, Overheat)
+HV not being set correctly
