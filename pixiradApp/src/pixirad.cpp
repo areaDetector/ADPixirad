@@ -134,6 +134,11 @@ static const char *driverName = "pixirad";
 #define PixiradPeltierPowerString    "PELTIER_POWER"
 #define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 
+#define INITIAL_HV_VALUE 350
+#define INITIAL_HV_STATE HVOn
+#define INITIAL_HV_MODE HVAuto
+#define INITIAL_COOLING_VALUE 15
+#define INITIAL_COOLING_STATE CoolingOn
 
 /** Driver for PiXirad pixel array detectors using their server server over TCP/IP socket */
 class pixirad : public ADDriver {
@@ -309,11 +314,11 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status |= setIntegerParam(ADTriggerMode, TMInternal);
     status |= setDoubleParam(ADAcquireTime, 1.0);
     status |= setDoubleParam(ADAcquirePeriod, 1.0);
-    status |= setDoubleParam(ADTemperature, 20.0);
-    status |= setIntegerParam(PixiradCoolingState, 0);
-    status |= setDoubleParam(PixiradHVValue, 200.0);
-    status |= setIntegerParam(PixiradHVState, HVOff);
-    status |= setIntegerParam(PixiradHVMode, HVAuto);
+    status |= setDoubleParam(ADTemperature, INITIAL_COOLING_VALUE);
+    status |= setIntegerParam(PixiradCoolingState, INITIAL_COOLING_STATE);
+    status |= setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE);
+    status |= setIntegerParam(PixiradHVState, INITIAL_HV_STATE);
+    status |= setIntegerParam(PixiradHVMode, INITIAL_HV_MODE);
     status |= setIntegerParam(PixiradDownloadSpeed, SpeedHigh);
     status |= setDoubleParam(PixiradThreshold1, 10.0);
     status |= setDoubleParam(PixiradThreshold2, 15.0);
@@ -323,7 +328,14 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status |= setIntegerParam(PixiradSyncInPolarity, SyncPos);
     status |= setIntegerParam(PixiradSyncOutPolarity, SyncPos);
     status |= setIntegerParam(PixiradSyncOutFunction, SyncOutShutter);
-
+    
+    // There is a bug in the current firmware.  
+    // Two different HV values must be sent or it won't accept it.
+    setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE - 1.0);
+    setCoolingAndHV();
+    setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE);
+    setCoolingAndHV();
+    
     if (status) {
         printf("%s:%s: unable to set camera parameters\n", driverName, functionName);
         return;
@@ -460,6 +472,7 @@ asynStatus pixirad::startAcquire()
     getIntegerParam(ADTriggerMode, &triggerMode);
     getIntegerParam(PixiradDownloadSpeed, &downloadSpeed);
     getIntegerParam(PixiradHVMode, &HVMode);
+    setIntegerParam(ADNumImagesCounter, 0);
    
     epicsSnprintf(this->toServer, sizeof(this->toServer), 
                   "DAQ:! LOOP %d %d %d %s %s %s %s",
@@ -539,6 +552,7 @@ void pixirad::dataPortListenerTask()
     size_t dims[2];
     NDArray *pImage;
     int imageCounter;
+    int numImagesCounter;
     int arrayCallbacks;
     char header[20];
     int expectedSize;
@@ -597,13 +611,7 @@ void pixirad::dataPortListenerTask()
     dims[1] = sizeY;
     while (1) {
         unlock();
-asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-    "%s:%s: waiting for udp_client socket connection\n",
-    driverName, functionName);
         dataFd = epicsSocketAccept(fd, (struct sockaddr *)&clientAddr, &clientLen);
-asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-    "%s:%s: got udp_client socket connection\n",
-    driverName, functionName);
         lock();
         asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
                   "%s:%s new connection, socket=%d on port %d\n", 
@@ -621,46 +629,46 @@ asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
         getIntegerParam(NDArrayCounter, &imageCounter);
         imageCounter++;
         setIntegerParam(NDArrayCounter, imageCounter);
+        getIntegerParam(ADNumImagesCounter, &numImagesCounter);
+        numImagesCounter++;
+        setIntegerParam(ADNumImagesCounter, numImagesCounter);
         /* Call the callbacks to update any changes */
         callParamCallbacks();
-        
+
+        /* Get the current time */
+        epicsTimeGetCurrent(&startTime);
+        /* Get an image buffer from the pool */
+        pImage = this->pNDArrayPool->alloc(2, dims, NDUInt16, 0, NULL);
+        /* We release the mutex when reading image */
+        expectedSize = sizeof(header);
+        unlock();
+        actualSize = recv(dataFd, header, expectedSize, 0); 
+        expectedSize = sizeX * sizeY * 2;
+        actualSize = 0;
+        while (actualSize < expectedSize) {
+          nRead = recv(dataFd, (char *)pImage->pData + actualSize, expectedSize-actualSize, 0);
+          actualSize += nRead;
+        }
+        lock();
+        /* If there was an error jump to bottom of loop */
+        if (actualSize != expectedSize) {
+            asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+                      "%s:%s: error reading data, expectedSize=%lu, actualSize=%lu\n", 
+                      driverName, functionName, 
+                      (unsigned long)expectedSize, (unsigned long)actualSize);
+            pImage->release();
+            continue;
+        }
+
+        /* Put the frame number and time stamp into the buffer */
+        pImage->uniqueId = imageCounter;
+        pImage->timeStamp = startTime.secPastEpoch + startTime.nsec / 1.e9;
+        updateTimeStamp(&pImage->epicsTS);
+
+        /* Get any attributes that have been defined for this driver */        
+        this->getAttributes(pImage->pAttributeList);
+
         if (arrayCallbacks) {
-            /* Get the current time */
-            epicsTimeGetCurrent(&startTime);
-            /* Get an image buffer from the pool */
-            pImage = this->pNDArrayPool->alloc(2, dims, NDUInt16, 0, NULL);
-            /* We release the mutex when reading image */
-            expectedSize = sizeof(header);
-            unlock();
-            actualSize = recv(dataFd, header, expectedSize, 0); 
-            expectedSize = sizeX * sizeY * 2;
-            actualSize = 0;
-            while (actualSize < expectedSize) {
-              nRead = recv(dataFd, (char *)pImage->pData + actualSize, expectedSize-actualSize, 0);
-              actualSize += nRead;
-asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-    "%s:%s: nRead=%d, actualSize=%d, expectedSize=%d\n", 
-    driverName, functionName, nRead, actualSize, expectedSize);
-            }
-            lock();
-            /* If there was an error jump to bottom of loop */
-            if (actualSize != expectedSize) {
-                asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-                          "%s:%s: error reading data, expectedSize=%lu, actualSize=%lu\n", 
-                          driverName, functionName, 
-                          (unsigned long)expectedSize, (unsigned long)actualSize);
-                pImage->release();
-                continue;
-            }
-
-            /* Put the frame number and time stamp into the buffer */
-            pImage->uniqueId = imageCounter;
-            pImage->timeStamp = startTime.secPastEpoch + startTime.nsec / 1.e9;
-            updateTimeStamp(&pImage->epicsTS);
-
-            /* Get any attributes that have been defined for this driver */        
-            this->getAttributes(pImage->pAttributeList);
-
             /* Call the NDArray callback */
             /* Must release the lock here, or we can get into a deadlock, because we can
              * block on the plugin lock, and the plugin can be calling us */
@@ -669,10 +677,14 @@ asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
                  "%s:%s: calling NDArray callback\n", driverName, functionName);
             doCallbacksGenericPointer(pImage, NDArrayData, 0);
             lock();
-            /* Free the image buffer */
-            pImage->release();
         }
+        /* Free the image buffer */
+        pImage->release();
         epicsSocketDestroy(dataFd);
+        if (numImagesCounter >= numFrames) {
+            setIntegerParam(ADAcquire, 0);
+            callParamCallbacks();
+        }
     }
 }
 
@@ -810,7 +822,8 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
             status = startAcquire();
         } 
         else if (!value && isAcquiring) {
-            status = stopAcquire();
+            //  This seems to be screwing things up, comment out temporarily
+            //status = stopAcquire();
         }
 
     } else if ((function == PixiradSyncInPolarity)  ||
@@ -818,18 +831,8 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
                (function == PixiradSyncOutFunction)) {
         status = setSync();
 
-    } else if (function == PixiradHVState) {
-//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
-//                     "SRV:! SET_HV_%s",
-//                      value ? "ON" : "OFF");
-//        status = writeReadServer(1.0);
-          status = setCoolingAndHV();
-    
-    } else if (function == PixiradCoolingState) {
-//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
-//                      "SRV:! SET_TCOLD_MANAGEMENT_%s",
-//                      value ? "ON" : "OFF");
-//        status = writeReadServer(1.0);
+    } else if ((function == PixiradHVState) ||
+               (function == PixiradCoolingState)) {
           status = setCoolingAndHV();
         
     } else if (function == PixiradAutoCalibrate) {
@@ -870,18 +873,8 @@ asynStatus pixirad::writeFloat64(asynUser *pasynUser, epicsFloat64 value)
      * status at the end, but that's OK */
     status = setDoubleParam(function, value);
     
-    if (function == ADTemperature) {
-//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
-//                      "SRV:! SET_TCOLD %d",
-//                      (int) value);
-//        status = writeReadServer(1.0);
-        status = setCoolingAndHV();
-    
-    } else if (function == PixiradHVValue) {
-//        epicsSnprintf(this->toServer, sizeof(this->toServer), 
-//                      "SRV:! SET_HV %d",
-//                      (int) value);
-//        status = writeReadServer(1.0);
+    if ((function == ADTemperature) ||
+        (function == PixiradHVValue)) {
         status = setCoolingAndHV();
 
     } else if ((function == PixiradThreshold1) ||
