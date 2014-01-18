@@ -1,7 +1,8 @@
 Fix threshold calculations
-Get read data working for multiple images
 Documentation
 Eliminate need for udp_client.exe
 Try with DHCP
 Temperature status (OK, DP warning, DP error, Overheat)
-HV not being set correctly
+Add system reset
+Store multi-color files as [NX, NY, NCOLORS]
+
