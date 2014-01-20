@@ -199,7 +199,7 @@ void decode_pixie_data_buffer(unsigned short* table, unsigned short* databuffer)
 void databuffer_filtering(unsigned short *buffer_a,unsigned short low_limit,unsigned short high_limit){
     unsigned long i,suppressed=0;
 
-    for(i=HEADER_LENGHT;i<(PIXIE_COLS*PIXIE_ROWS)+HEADER_LENGHT;i++)
+    for(i=HEADER_LENGTH;i<(PIXIE_COLS*PIXIE_ROWS)+HEADER_LENGTH;i++)
         if ((buffer_a[i]<low_limit)||(buffer_a[i]>high_limit)){
                 buffer_a[i]=0;
                 suppressed++;
@@ -213,7 +213,7 @@ void check_data_consistency(unsigned short*data_buffer,unsigned short test_patte
     unsigned long i,total_failed_channels=0, partial_failed_channels[PIXIE_DOUTS]={0};
     double percentage_total_failed_channels,percentage_partial_failed_channels[PIXIE_DOUTS]={0};
     for(i=0;i<(PIXIE_COLS*PIXIE_ROWS);i++){
-        if(data_buffer[i+HEADER_LENGHT]!=test_pattern) {
+        if(data_buffer[i+HEADER_LENGTH]!=test_pattern) {
                         total_failed_channels++;
                         partial_failed_channels[(unsigned short)(i/(COLS_PER_DOUT*PIXIE_ROWS))]++;
         }
@@ -230,28 +230,28 @@ void check_data_consistency(unsigned short*data_buffer,unsigned short test_patte
 
 int dummy_buffer_init(unsigned short*data_buffer,char *namefile){
     FILE * imagefile;
-    unsigned char dummy_buff[FRAME_LENGHT/2];
+    unsigned char dummy_buff[FRAME_LENGTH/2];
     unsigned long i;
     imagefile=fopen(namefile,"r");
     if(imagefile==NULL){
-        for(i=HEADER_LENGHT;i<FRAME_LENGHT/2;i++)
+        for(i=HEADER_LENGTH;i<FRAME_LENGTH/2;i++)
         data_buffer[i]=0;
         return(1);
     }
     fread(dummy_buff,1,MATRIX_DIM_WORDS,imagefile);
     fclose(imagefile);
     for(i=0;i<MATRIX_DIM_WORDS;i++)
-        data_buffer[i+HEADER_LENGHT]=dummy_buff[i];
-    for(;i<FRAME_LENGHT/2;i++)
-        data_buffer[i+HEADER_LENGHT]=0;
+        data_buffer[i+HEADER_LENGTH]=dummy_buff[i];
+    for(;i<FRAME_LENGTH/2;i++)
+        data_buffer[i+HEADER_LENGTH]=0;
 
     return(0);
 }
 void copy_databuff_to_netbuff(unsigned short* databuff, unsigned short* netbuff,unsigned char position){
-    unsigned long i=HEADER_LENGHT;
+    unsigned long i=HEADER_LENGTH;
     if (position==0) {
-        for(i=0;i<HEADER_LENGHT+MATRIX_DIM_WORDS;i++) netbuff[i]=databuff[i];
+        for(i=0;i<HEADER_LENGTH+MATRIX_DIM_WORDS;i++) netbuff[i]=databuff[i];
     }//MATRIX_DIM is intended to be for bytes
     else
-        for(i=0;i<MATRIX_DIM_WORDS;i++) netbuff[i+HEADER_LENGHT+position*MATRIX_DIM_WORDS]=databuff[i+HEADER_LENGHT];
+        for(i=0;i<MATRIX_DIM_WORDS;i++) netbuff[i+HEADER_LENGTH+position*MATRIX_DIM_WORDS]=databuff[i+HEADER_LENGTH];
 }
