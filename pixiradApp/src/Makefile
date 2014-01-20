@@ -6,15 +6,9 @@ include $(TOP)/configure/CONFIG
 LIBRARY_IOC += pixirad
 
 LIB_SRCS += pixirad.cpp
+LIB_SRCS += PIXIEII_data_utilities.cpp
 
 DBD += pixiradSupport.dbd
-
-PROD_IOC += udp_client_pixirad_single
-PROD_SRCS += udp_client_pixirad_single.cpp
-PROD_SRCS += PIXIEII_data_utilities.cpp
-PROD_LIBS += $(EPICS_BASE_IOC_LIBS)
-
-
 
 include $(ADCORE)/ADApp/commonLibraryMakefile
 
