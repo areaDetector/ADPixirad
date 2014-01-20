@@ -34,12 +34,35 @@
 #include <asynOctetSyncIO.h>
 
 #include "ADDriver.h"
+#include "PIXIEII_data_utilities.h"
 
 /** Messages to/from server */
 #define MAX_MESSAGE_SIZE 256 
 #define SERVER_DEFAULT_TIMEOUT 1.0
 /** Additional time to wait for a server response after the acquire should be complete */ 
 #define SERVER_ACQUIRE_TIMEOUT 10.
+
+#define MAX_UDP_DATA_BUFFER     256217728
+#define MAX_UDP_PACKET_LEN           1448
+#define DEFAULT_UDP_NUM_PACKETS       360
+#define DAQ_PACKET_FRAGMENT            45
+#define AUTOCAL_DATA                 0x40
+#define AUTOCAL_NUM_PACKETS           135
+#define PACKET_ID_OFFSET                2
+#define PACKET_ID_BYTES                 2
+#define PACKET_CRC_BYTES                4
+#define PACKET_TAG_BYTES                2
+#define PACKET_TAG_OFFSET               0
+#define FRAME_HAS_ALIGN_ERRORS       0x20
+#define PACKET_SENSOR_DATA_OFFSET    (PACKET_TAG_BYTES + PACKET_ID_BYTES)
+#define PACKET_EXTRA_BYTES           (PACKET_ID_BYTES + PACKET_TAG_BYTES + PACKET_CRC_BYTES)
+#define PACKET_SENSOR_DATA_BYTES     (MAX_UDP_PACKET_LEN - PACKET_EXTRA_BYTES)
+#define PIXIEII_MODULES                 1
+#define PIXIE_THDAC_OFFSET              0
+#define DUMMY_0_OFFSET                  0
+#define PIXIE_THDAC_MASK             0x1f
+#define PIXIE_THDAC_OFFSET              0
+#define DUMMY_1_OFFSET                  8
 
 /** Save data */
 typedef enum {
@@ -144,7 +167,7 @@ static const char *driverName = "pixirad";
 class pixirad : public ADDriver {
 public:
     pixirad(const char *portName, const char *commandPortName,
-            int dataPortNumber, int statusPortnumber,
+            int dataPortNumber, int statusPortnumber, int maxDataPortBuffers,
             int maxSizeX, int maxSizeY,
             int maxBuffers, size_t maxMemory,
             int priority, int stackSize);
@@ -155,7 +178,8 @@ public:
     void report(FILE *fp, int details);
     /* These should be private but are called from C so must be public */
     void statusTask();
-    void dataPortListenerTask();
+    void dataTask();
+    void udpDataListenerTask();
     
 protected:
     int PixiradCollectionMode;
@@ -195,14 +219,13 @@ private:
     asynStatus stopAcquire();
    
     /* Our data */
-    int imagesRemaining;
-    epicsEventId startEventId;
-    epicsEventId stopEventId;
-    int dataPortNumber;
-    int statusPortNumber;
-    char toServer[MAX_MESSAGE_SIZE];
-    char fromServer[MAX_MESSAGE_SIZE];
-    asynUser *pasynUserCommand;
+    epicsMessageQueueId dataMessageQueueId_;
+    int dataPortNumber_;
+    int statusPortNumber_;
+    int maxDataPortBuffers_;
+    char toServer_[MAX_MESSAGE_SIZE];
+    char fromServer_[MAX_MESSAGE_SIZE];
+    asynUser *pasynUserCommand_;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
@@ -214,12 +237,49 @@ static void statusTaskC(void *drvPvt)
     pPvt->statusTask();
 }
 
-static void dataPortListenerTaskC(void *drvPvt)
+static void dataTaskC(void *drvPvt)
 {
     pixirad *pPvt = (pixirad *)drvPvt;
     
-    pPvt->dataPortListenerTask();
+    pPvt->dataTask();
 }
+
+static void udpDataListenerTaskC(void *drvPvt)
+{
+    pixirad *pPvt = (pixirad *)drvPvt;
+    
+    pPvt->udpDataListenerTask();
+}
+
+static int convert_bit_stream_to_counts(int code_depth, unsigned short* source_memory_offset,
+                                        unsigned short* destination_memory_offset, int reusulting_readings)
+{
+    int i,j;
+    unsigned short dout_masks[PIXIE_DOUTS], mask_seed=1;
+    for(i=0;i<reusulting_readings;i++) dout_masks[i]=(mask_seed<<i);
+    for(j=0;j<reusulting_readings;j++){
+        destination_memory_offset[j]=0;
+        for(i=code_depth-1;i>=0;i--){
+            if(source_memory_offset[i] & dout_masks[j])
+                destination_memory_offset[j]|= dout_masks[code_depth-i-1];
+            else
+                destination_memory_offset[j]&= ~dout_masks[code_depth-i-1];
+        }
+    }
+    return(j);
+}
+
+static void my_bytes_swap(unsigned short* us_ptr)
+{
+    char a, b, *temp_char_ptr;
+    temp_char_ptr = (char*)us_ptr;
+    a = *temp_char_ptr;
+    b = *(temp_char_ptr+1);
+    *(temp_char_ptr+1) = a;
+    *(temp_char_ptr) = b;
+}
+
+
 
 /** Constructor for Pixirad driver; most parameters are simply passed to ADDriver::ADDriver.
   * After calling the base class constructor this method creates a thread to collect the detector data, 
@@ -238,7 +298,7 @@ static void dataPortListenerTaskC(void *drvPvt)
   * \param[in] stackSize The stack size for the asyn port driver thread if ASYN_CANBLOCK is set in asynFlags.
   */
 pixirad::pixirad(const char *portName, const char *commandPortName,
-                 int dataPortNumber, int statusPortNumber,
+                 int dataPortNumber, int statusPortNumber, int maxDataPortBuffers,
                  int maxSizeX, int maxSizeY,
                  int maxBuffers, size_t maxMemory,
                  int priority, int stackSize)
@@ -246,32 +306,32 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     : ADDriver(portName, 1, NUM_PIXIRAD_PARAMS, maxBuffers, maxMemory,
                0, 0,             /* No interfaces beyond those set in ADDriver.cpp */
                ASYN_CANBLOCK, 1, /* ASYN_CANBLOCK=1, ASYN_MULTIDEVICE=0, autoConnect=1 */
-               priority, stackSize),
-      imagesRemaining(0)
+               priority, stackSize)
 
 {
     int status = asynSuccess;
     const char *functionName = "pixirad";
 
-    this->dataPortNumber = dataPortNumber;
-    this->statusPortNumber = statusPortNumber;
+    dataPortNumber_ = dataPortNumber;
+    statusPortNumber_ = statusPortNumber;
+    maxDataPortBuffers_ = maxDataPortBuffers;
 
-    /* Create the epicsEvents for signaling to the Pixirad task when acquisition starts and stops */
-    this->startEventId = epicsEventCreate(epicsEventEmpty);
-    if (!this->startEventId) {
-        printf("%s:%s: epicsEventCreate failure for start event\n", 
+    dataMessageQueueId_ = epicsMessageQueueCreate(maxDataPortBuffers_, sizeof(unsigned char *));
+    if (dataMessageQueueId_ == 0) {
+        printf("%s:%s: epicsMessageQueueCreate failed\n",
             driverName, functionName);
         return;
     }
-    this->stopEventId = epicsEventCreate(epicsEventEmpty);
-    if (!this->stopEventId) {
-        printf("%s:%s: epicsEventCreate failure for stop event\n", 
+
+    if (osiSockAttach() == 0) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+            "%s:%s: osiSockAttach failed\n",
             driverName, functionName);
         return;
     }
-    
+
     /* Connect to Pixirad server */
-    status = pasynOctetSyncIO->connect(commandPortName, 0, &this->pasynUserCommand, NULL);
+    status = pasynOctetSyncIO->connect(commandPortName, 0, &pasynUserCommand_, NULL);
 
     createParam(PixiradCollectionModeString,  asynParamInt32,   &PixiradCollectionMode);
     createParam(PixiradSaveDataString,        asynParamInt32,   &PixiradSaveData);
@@ -347,11 +407,17 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
                        epicsThreadGetStackSize(epicsThreadStackMedium),
                        (EPICSTHREADFUNC)statusTaskC, this);
 
-    /* Create the thread that listens for connections on the data port */
+    /* Create the thread that gets messages from the UDP data task and does NDArray callbacks */
     epicsThreadCreate("PixiradDataTask",
                        epicsThreadPriorityMedium,
                        epicsThreadGetStackSize(epicsThreadStackMedium),
-                       (EPICSTHREADFUNC)dataPortListenerTaskC, this);
+                       (EPICSTHREADFUNC)dataTaskC, this);
+
+    /* Create the thread that reads UDP data from the detector */
+    epicsThreadCreate("PixiradUDPDataTask",
+                       epicsThreadPriorityMedium,
+                       epicsThreadGetStackSize(epicsThreadStackMedium),
+                       (EPICSTHREADFUNC)udpDataListenerTaskC, this);
 
 }
 
@@ -368,7 +434,7 @@ asynStatus pixirad::setCoolingAndHV()
     getDoubleParam(PixiradHVValue, &HVValue);
     getIntegerParam(PixiradHVState, &HVState);
     
-    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+    epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! INIT %.1f %d %.1f %d", 
                   coolingValue, coolingState, HVValue, HVState);
     status = writeReadServer(1.0);
@@ -386,7 +452,7 @@ asynStatus pixirad::setSync()
     getIntegerParam(PixiradSyncOutPolarity, &syncOutPolarity);
     getIntegerParam(PixiradSyncOutFunction, &syncOutFunction);
     
-    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+    epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! SET_SYNC %s %s %s", 
                   PixiradSyncPolarityStrings[syncInPolarity],
                   PixiradSyncPolarityStrings[syncOutPolarity],
@@ -433,7 +499,7 @@ asynStatus pixirad::setThresholds()
     setDoubleParam(PixiradThreshold3, actualThresholdEnergy[2]);
     setDoubleParam(PixiradThreshold4, actualThresholdEnergy[3]);
     
-    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+    epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
                   thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
                   vthMax, ref, auFS, dtf, nbi);
@@ -445,7 +511,7 @@ asynStatus pixirad::doAutoCalibrate()
 {
     asynStatus status;
     
-    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+    epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! AUTOCAL");
     status = writeReadServer(1.0);
     return status;
@@ -474,7 +540,7 @@ asynStatus pixirad::startAcquire()
     getIntegerParam(PixiradHVMode, &HVMode);
     setIntegerParam(ADNumImagesCounter, 0);
    
-    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+    epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! LOOP %d %d %d %s %s %s %s",
                   numImages, 
                   (int)(acquireTime*1000),
@@ -491,7 +557,7 @@ asynStatus pixirad::stopAcquire()
 {
     asynStatus status;
     
-    epicsSnprintf(this->toServer, sizeof(this->toServer), 
+    epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:!!ACQUISITIONBREAK");
     status = writeReadServer(1.0);
     return status;
@@ -502,24 +568,24 @@ asynStatus pixirad::writeReadServer(double timeout)
 {
     size_t nwrite, nread;
     asynStatus status=asynSuccess;
-    asynUser *pasynUser = this->pasynUserCommand;
+    asynUser *pasynUser = pasynUserCommand_;
     int eomReason;
     const char *functionName="writeReadServer";
 
-    status = pasynOctetSyncIO->writeRead(pasynUser, this->toServer, strlen(this->toServer), 
-                                         this->fromServer, sizeof(this->fromServer), 
+    status = pasynOctetSyncIO->writeRead(pasynUser, toServer_, strlen(toServer_), 
+                                         fromServer_, sizeof(fromServer_), 
                                          timeout, &nwrite, &nread, &eomReason);
     if (status != asynSuccess)
         asynPrint(pasynUser, ASYN_TRACE_ERROR,
                     "%s:%s, timeout=%f, status=%d wrote %lu bytes, received %lu bytes\n%s\n",
                     driverName, functionName, timeout, status, 
-                    (unsigned long)nwrite, (unsigned long)nread, this->fromServer);
+                    (unsigned long)nwrite, (unsigned long)nread, fromServer_);
     else {
         /* Look for the string "GOT:" in the response */
-        if (!strstr(this->fromServer, "GOT:")) {
+        if (!strstr(fromServer_, "GOT:")) {
             asynPrint(pasynUser, ASYN_TRACE_ERROR,
                       "%s:%s unexpected response from server = %s\n",
-                      driverName, functionName, this->fromServer);
+                      driverName, functionName, fromServer_);
             setStringParam(ADStatusMessage, "Error from server");
             status = asynError;
         } else
@@ -527,25 +593,15 @@ asynStatus pixirad::writeReadServer(double timeout)
     }
 
     /* Set input and output strings so they can be displayed by EPICS */
-    setStringParam(ADStringToServer, this->toServer);
-    setStringParam(ADStringFromServer, this->fromServer);
+    setStringParam(ADStringToServer, toServer_);
+    setStringParam(ADStringFromServer, fromServer_);
 
     return(status);
 }
 
 
-void pixirad::dataPortListenerTask()
+void pixirad::dataTask()
 {
- /*
-  * This is the thread that listens for connections from the udp_client.exe.
-  */
-    struct sockaddr_in clientAddr;
-    int dataFd;
-    osiSocklen_t clientLen=sizeof(clientAddr);
-    int socketType = SOCK_STREAM;
-    int i;
-    SOCKET fd;
-    struct sockaddr_in serverAddr;
     int numFrames;
     int collectionMode;
     int sizeX, sizeY;
@@ -554,75 +610,86 @@ void pixirad::dataPortListenerTask()
     int imageCounter;
     int numImagesCounter;
     int arrayCallbacks;
-    char header[20];
-    int expectedSize;
-    int actualSize;
-    int nRead;
     epicsTimeStamp startTime;
-    static const char *functionName = "dataPortListener";
+    int is_autocal_data, i, j ,k, code_depth;
+    unsigned short *local_buffer_ptr, *temp_us_ptr, *conv, *process_buf_ptr;
+    unsigned short packet_tag;
+    int status;
+    static const char *functionName = "dataTask";
 
-    lock();
-    if (osiSockAttach() == 0) {
+    local_buffer_ptr = (unsigned short *) calloc(PIXIEII_MODULES*MATRIX_DIM_WORDS*15, sizeof(unsigned short));
+    if(local_buffer_ptr == NULL){
         asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
-            "%s:%s: osiSockAttach failed\n",
+            "%s:%s: Error allocating local buffer\n",
             driverName, functionName);
         return;
     }
+    conv = conversion_table_allocation();
 
-    // Create the socket
-    if ((fd = epicsSocketCreate(PF_INET, socketType, 0)) < 0) {
-        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
-            "%s:%s: Can't create socket: %s\n", 
-            driverName, functionName, strerror(SOCKERRNO));
-        return;
-    }
-
-    epicsSocketEnableAddressReuseDuringTimeWaitState(fd);
-
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(dataPortNumber);
-    if (bind(fd, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
-    {
-        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
-            "%s:%s: Error in binding port %d: %s\n", 
-            driverName, functionName, dataPortNumber, strerror(errno));
-        epicsSocketDestroy(fd);
-        return;
-    }
-
-    // Enable listening on this port
-    i = listen(fd, 1);
-    if (i < 0) {
-        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
-            "%s:%s: Error calling listen() on port %d:  %s\n",
-            driverName, functionName, dataPortNumber, strerror(errno));
-        epicsSocketDestroy(fd);
-        return;
-    }
-
-    asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
-              "%s:%s: started listening for connections on port %d\n", 
-              driverName, functionName, dataPortNumber);
-    
+    lock();
     getIntegerParam(ADMaxSizeX, &sizeX);
     getIntegerParam(ADMaxSizeY, &sizeY);
     dims[0] = sizeX;
     dims[1] = sizeY;
-    while (1) {
+    while(1) {
         unlock();
-        dataFd = epicsSocketAccept(fd, (struct sockaddr *)&clientAddr, &clientLen);
+        status = epicsMessageQueueReceive(dataMessageQueueId_, &process_buf_ptr, sizeof(&process_buf_ptr));
         lock();
-        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
-                  "%s:%s new connection, socket=%d on port %d\n", 
-                  driverName, functionName, dataFd, dataPortNumber);
-        if (dataFd < 0) {
-            asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-                      "%s:%s: accept error on port %d: fd=%d, %s\n", 
-                      driverName, functionName, dataPortNumber,
-                      fd, strerror(errno));
+        if (status <= 0) {
+            asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+                "%s:%s: Error calling epicsMessageQueueReceive, status=%d\n",
+                driverName, functionName, status);
+             continue;
+        }
+        if (process_buf_ptr == NULL) {
+            asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+                "%s:%s: Error process_buf_ptr=NULL\n",
+                driverName, functionName);
             continue;
         }
+        unlock();
+        packet_tag = *(process_buf_ptr + PACKET_TAG_OFFSET*2);
+        if (packet_tag & AUTOCAL_DATA) {
+            code_depth = 5;
+            is_autocal_data = 1;
+        } else {
+            code_depth = 15;
+            is_autocal_data = 0;
+        }
+        if (packet_tag & FRAME_HAS_ALIGN_ERRORS) {
+            asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
+                "%s:%s: frame has alignment errors\n",
+                driverName, functionName);
+        }
+
+        temp_us_ptr = process_buf_ptr + (PACKET_TAG_BYTES/2);
+        for (i=0; i<PIXIEII_MODULES; i++) {
+            for(j=0; j<COLS_PER_DOUT*PIXIE_ROWS; j++) {
+                for (k=0; k<code_depth; k++){
+                    my_bytes_swap(temp_us_ptr + i +( j*PIXIEII_MODULES*code_depth) + (k*PIXIEII_MODULES));
+                    local_buffer_ptr[(i*COLS_PER_DOUT*PIXIE_ROWS*code_depth) + (j*code_depth)+k] =
+                        temp_us_ptr[i + (j*PIXIEII_MODULES*code_depth) +( k*PIXIEII_MODULES)];
+                }
+            }
+        }
+
+        for(i=0; i<PIXIEII_MODULES; i++){
+            for(j=0; j<COLS_PER_DOUT*PIXIE_ROWS; j++) {
+                convert_bit_stream_to_counts(code_depth,
+                    local_buffer_ptr + (i*COLS_PER_DOUT*PIXIE_ROWS*code_depth) + (j*code_depth),
+                    process_buf_ptr + (i*MATRIX_DIM_WORDS) + (j*PIXIE_DOUTS) + (PACKET_TAG_BYTES/2), PIXIE_DOUTS);
+
+            }
+        }
+
+        for(i=0; i<PIXIEII_MODULES; i++){
+            if (is_autocal_data == 0)
+                decode_pixie_data_buffer(conv, process_buf_ptr + (PACKET_TAG_BYTES/2) + i*MATRIX_DIM_WORDS);
+            databuffer_sorting(process_buf_ptr + (PACKET_TAG_BYTES/2) + i*MATRIX_DIM_WORDS);
+            map_data_buffer_on_pixie(process_buf_ptr + (PACKET_TAG_BYTES/2) + i*MATRIX_DIM_WORDS);
+        }
+
+        lock();
         getIntegerParam(ADNumImages, &numFrames);
         getIntegerParam(PixiradCollectionMode, &collectionMode);
         getIntegerParam(NDArrayCallbacks, &arrayCallbacks);
@@ -639,26 +706,12 @@ void pixirad::dataPortListenerTask()
         epicsTimeGetCurrent(&startTime);
         /* Get an image buffer from the pool */
         pImage = this->pNDArrayPool->alloc(2, dims, NDUInt16, 0, NULL);
-        /* We release the mutex when reading image */
-        expectedSize = sizeof(header);
-        unlock();
-        actualSize = recv(dataFd, header, expectedSize, 0); 
-        expectedSize = sizeX * sizeY * 2;
-        actualSize = 0;
-        while (actualSize < expectedSize) {
-          nRead = recv(dataFd, (char *)pImage->pData + actualSize, expectedSize-actualSize, 0);
-          actualSize += nRead;
-        }
-        lock();
-        /* If there was an error jump to bottom of loop */
-        if (actualSize != expectedSize) {
-            asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
-                      "%s:%s: error reading data, expectedSize=%lu, actualSize=%lu\n", 
-                      driverName, functionName, 
-                      (unsigned long)expectedSize, (unsigned long)actualSize);
-            pImage->release();
-            continue;
-        }
+
+        /* Copy the data from the process_buf to the NDArray */
+        memcpy(pImage->pData, process_buf_ptr+PACKET_TAG_BYTES/2, MATRIX_DIM_WORDS * sizeof(unsigned short));
+
+        // Free the process_buf_ptr, no longer needed
+        free(process_buf_ptr);
 
         /* Put the frame number and time stamp into the buffer */
         pImage->uniqueId = imageCounter;
@@ -680,13 +733,155 @@ void pixirad::dataPortListenerTask()
         }
         /* Free the image buffer */
         pImage->release();
-        epicsSocketDestroy(dataFd);
         if (numImagesCounter >= numFrames) {
             setIntegerParam(ADAcquire, 0);
             callParamCallbacks();
         }
     }
 }
+
+void pixirad::udpDataListenerTask()
+{
+    struct sockaddr_in si_me;
+    unsigned short packet_tag;
+    unsigned int i,j,temp_NPACK;
+    SOCKET data_udp_sock_fd;
+    int this_frame_has_aligment_errors=0;
+    unsigned int packet_id, local_packet_id;
+    long packet_id_gap;
+    epicsTimeStamp timer_a, timer_b;
+    double  time_interval, MBytesPerSecond;
+    unsigned int received_packets=0;
+    unsigned int id_error_packets=0;
+    static const char *functionName = "udpDataListenerTask";
+    unsigned char *process_buf;
+    unsigned char *buf = (unsigned char*) calloc(MAX_UDP_PACKET_LEN * DEFAULT_UDP_NUM_PACKETS, sizeof(unsigned short));
+
+    if ((data_udp_sock_fd = epicsSocketCreate(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+            "%s:%s: Error creating socket error = %s\n", 
+            driverName, functionName, strerror(errno));
+        return;
+    }
+
+    memset((char *) &si_me, 0, sizeof(si_me));
+    si_me.sin_family = AF_INET;
+    si_me.sin_port = htons(dataPortNumber_);
+    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (bind(data_udp_sock_fd, (struct sockaddr *) &si_me, sizeof(si_me)) == -1) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+            "%s:%s: Error binding socket error = %s\n", 
+            driverName, functionName, strerror(errno));
+        return;
+    }
+
+    int buffsize;
+    osiSocklen_t czm = sizeof(int);
+    int received_bytes;
+    buffsize = MAX_UDP_DATA_BUFFER;
+    if (setsockopt(data_udp_sock_fd, SOL_SOCKET,
+                   SO_RCVBUF,
+                   (char*)&buffsize,
+                   czm) == -1) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+            "%s:%s: Error calling setsockopt for SO_RCVBUF = %s\n", 
+            driverName, functionName, strerror(errno));
+        return;
+    }
+
+    if (getsockopt(data_udp_sock_fd, SOL_SOCKET,
+                   SO_RCVBUF,
+                   (char*)&buffsize,
+                   &czm) == -1) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+            "%s:%s: Error calling getsockopt for SO_RCVBUF = %s\n", 
+            driverName, functionName, strerror(errno));
+        return;
+    }
+
+    if (buffsize != MAX_UDP_DATA_BUFFER) {
+        asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+            "%s:%s: Unable to set requested buffer size for SO_RCVBUF, actual=%d\n", 
+            driverName, functionName, buffsize);
+    }
+
+    while (1) {
+        this_frame_has_aligment_errors=0;
+        temp_NPACK = DEFAULT_UDP_NUM_PACKETS;
+        i=0;
+        while(i < temp_NPACK ) {
+            j = 0;
+            while(j < DAQ_PACKET_FRAGMENT) {
+                received_bytes=recvfrom(data_udp_sock_fd, (char*) buf+(i*MAX_UDP_PACKET_LEN), MAX_UDP_PACKET_LEN, 0, NULL, 0);
+                if (received_bytes == -1) {
+                    asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+                        "%s:%s: Error calling recvfrom = %s\n", 
+                        driverName, functionName, strerror(errno));
+                } else if (received_bytes == MAX_UDP_PACKET_LEN) {
+                    if (i == 0)  epicsTimeGetCurrent(&timer_a);
+                    received_packets++;
+                    packet_tag = *buf;
+                    if (packet_tag & AUTOCAL_DATA)
+                        temp_NPACK = AUTOCAL_NUM_PACKETS;
+                    else
+                        temp_NPACK = DEFAULT_UDP_NUM_PACKETS;
+
+                    packet_id = buf[MAX_UDP_PACKET_LEN*(i)+PACKET_ID_OFFSET]<<8;
+                    packet_id += buf[MAX_UDP_PACKET_LEN*(i)+1+PACKET_ID_OFFSET];
+                    packet_id = packet_id%DAQ_PACKET_FRAGMENT;
+                    packet_id_gap = (packet_id-j);
+
+                    if (packet_id_gap != 0){
+                        if (id_error_packets<10)
+                            printf("ID: %d j= %d\n",packet_id,j);
+                        id_error_packets++;
+                        this_frame_has_aligment_errors=1;
+                    }
+                    if (packet_id_gap >= 0){
+                        j+=(packet_id_gap+1);
+                        i+=(packet_id_gap+1);
+                    }
+                    else {
+                        j=DAQ_PACKET_FRAGMENT;
+                        i+=DAQ_PACKET_FRAGMENT;
+                    }
+                }
+            }
+        }
+
+        epicsTimeGetCurrent(&timer_b);
+        time_interval = epicsTimeDiffInSeconds(&timer_b, &timer_a);
+        MBytesPerSecond = (i * MAX_UDP_PACKET_LEN) / (time_interval*1024*1024);
+        asynPrint(pasynUserSelf, ASYN_TRACEIO_DRIVER,
+            "%s:%s: received %d packets (%d bytes each)  in %.3f s, = %.3f MB/s\n",
+            driverName, functionName, i, MAX_UDP_PACKET_LEN, time_interval, MBytesPerSecond);
+
+        i=0;
+        local_packet_id=0;
+        process_buf = (unsigned char *) calloc((MAX_UDP_PACKET_LEN - PACKET_EXTRA_BYTES + PACKET_TAG_BYTES) * DEFAULT_UDP_NUM_PACKETS, 
+                                              sizeof(unsigned short));
+        if (process_buf == NULL) {
+            asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
+                "%s:%s: error allocated process_buf\n", 
+                driverName, functionName);
+            return;
+        }
+        while(i < temp_NPACK) {
+            memcpy(process_buf + PACKET_TAG_BYTES + (PACKET_SENSOR_DATA_BYTES * local_packet_id),
+                   buf + PACKET_SENSOR_DATA_OFFSET + (MAX_UDP_PACKET_LEN*i), PACKET_SENSOR_DATA_BYTES);
+            for(j=0; j<PACKET_TAG_BYTES; j++)
+                process_buf[PACKET_TAG_OFFSET+j] = buf[j];\
+            if (this_frame_has_aligment_errors)
+                process_buf[PACKET_TAG_OFFSET] |= FRAME_HAS_ALIGN_ERRORS;
+            else
+                process_buf[PACKET_TAG_OFFSET] &= (~FRAME_HAS_ALIGN_ERRORS);
+            local_packet_id++;
+            i++;
+        }
+        epicsMessageQueueSend(dataMessageQueueId_, &process_buf, sizeof(&process_buf));
+    }
+}
+
 
 
 /** This function reads the environmental parameters (temperature, humidity, etc.)
@@ -723,12 +918,6 @@ void pixirad::statusTask()
   static const char *functionName = "statusTask";
 
   lock();
-  if (osiSockAttach() == 0) {
-      asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
-          "%s:%s: osiSockAttach failed\n",
-          driverName, functionName);
-      return;
-  }
 
   // Create the socket
   if ((fd = epicsSocketCreate(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
@@ -740,12 +929,12 @@ void pixirad::statusTask()
 
   serverAddr.sin_family = AF_INET;
   serverAddr.sin_addr.s_addr = INADDR_ANY;
-  serverAddr.sin_port = htons(statusPortNumber);
+  serverAddr.sin_port = htons(statusPortNumber_);
   if (bind(fd, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
   {
       asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
           "%s:%s: Error in binding port %d: %s\n", 
-          driverName, functionName, statusPortNumber, strerror(errno));
+          driverName, functionName, statusPortNumber_, strerror(errno));
       epicsSocketDestroy(fd);
       return;
   }
@@ -927,12 +1116,12 @@ void pixirad::report(FILE *fp, int details)
 }
 
 extern "C" int pixiradConfig(const char *portName, const char *commandPort,
-                                    int dataPortNumber, int statusPortNumber,
+                                    int dataPortNumber, int statusPortNumber, int maxDataPortBuffers,
                                     int maxSizeX, int maxSizeY,
                                     int maxBuffers, size_t maxMemory,
                                     int priority, int stackSize)
 {
-    new pixirad(portName, commandPort, dataPortNumber, statusPortNumber, 
+    new pixirad(portName, commandPort, dataPortNumber, statusPortNumber, maxDataPortBuffers,
                 maxSizeX, maxSizeY, maxBuffers, maxMemory,
                 priority, stackSize);
     return(asynSuccess);
@@ -943,12 +1132,13 @@ static const iocshArg pixiradConfigArg0 = {"Port name", iocshArgString};
 static const iocshArg pixiradConfigArg1 = {"command port name", iocshArgString};
 static const iocshArg pixiradConfigArg2 = {"data port number", iocshArgInt};
 static const iocshArg pixiradConfigArg3 = {"status port number", iocshArgInt};
-static const iocshArg pixiradConfigArg4 = {"maxSizeX", iocshArgInt};
-static const iocshArg pixiradConfigArg5 = {"maxSizeY", iocshArgInt};
-static const iocshArg pixiradConfigArg6 = {"maxBuffers", iocshArgInt};
-static const iocshArg pixiradConfigArg7 = {"maxMemory", iocshArgInt};
-static const iocshArg pixiradConfigArg8 = {"priority", iocshArgInt};
-static const iocshArg pixiradConfigArg9 = {"stackSize", iocshArgInt};
+static const iocshArg pixiradConfigArg4 = {"max data port buffers", iocshArgInt};
+static const iocshArg pixiradConfigArg5 = {"maxSizeX", iocshArgInt};
+static const iocshArg pixiradConfigArg6 = {"maxSizeY", iocshArgInt};
+static const iocshArg pixiradConfigArg7 = {"maxBuffers", iocshArgInt};
+static const iocshArg pixiradConfigArg8 = {"maxMemory", iocshArgInt};
+static const iocshArg pixiradConfigArg9 = {"priority", iocshArgInt};
+static const iocshArg pixiradConfigArg10 = {"stackSize", iocshArgInt};
 static const iocshArg * const pixiradConfigArgs[] =  {&pixiradConfigArg0,
                                                       &pixiradConfigArg1,
                                                       &pixiradConfigArg2,
@@ -958,13 +1148,14 @@ static const iocshArg * const pixiradConfigArgs[] =  {&pixiradConfigArg0,
                                                       &pixiradConfigArg6,
                                                       &pixiradConfigArg7,
                                                       &pixiradConfigArg8,
-                                                      &pixiradConfigArg9};
-static const iocshFuncDef configpixirad = {"pixiradConfig", 10, pixiradConfigArgs};
+                                                      &pixiradConfigArg9,
+                                                      &pixiradConfigArg10};
+static const iocshFuncDef configpixirad = {"pixiradConfig", 11, pixiradConfigArgs};
 static void configpixiradCallFunc(const iocshArgBuf *args)
 {
     pixiradConfig(args[0].sval, args[1].sval, args[2].ival,  args[3].ival,  
                   args[4].ival, args[5].ival, args[6].ival,  args[7].ival,
-                  args[8].ival, args[9].ival);
+                  args[8].ival, args[9].ival, args[10].ival);
 }
 
 
