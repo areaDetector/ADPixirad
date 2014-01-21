@@ -41,6 +41,9 @@ record(mbbi, "$(P)$(R)FileFormat_RBV")
     field(ONVL, "1")
 }
 
+#
+# These are the records that are new to the Pixirad driver
+#
 record(mbbo,"$(P)$(R)CollectionMode") {
     field(DESC, "Collection mode")
     field(PINI, "YES")
@@ -261,6 +264,14 @@ record(bi,"$(P)$(R)AutoCalibrate_RBV") {
     field(ZNAM, "Done")
     field(ONAM, "Calibrate")
     field(SCAN, "I/O Intr")
+}
+
+record(bo,"$(P)$(R)SystemReset") {
+    field(DESC, "System reset")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYSTEM_RESET")
+    field(ZNAM, "Done")
+    field(ONAM, "Reset")
 }
 
 record(ao, "$(P)$(R)HVValue")
