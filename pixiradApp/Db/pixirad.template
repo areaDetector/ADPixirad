@@ -79,24 +79,6 @@ record(mbbi,"$(P)$(R)CollectionMode_RBV") {
     field(SCAN, "I/O Intr")
 }
 
-record(bo,"$(P)$(R)SaveData") {
-    field(DESC, "Save data")
-    field(PINI, "YES")
-    field(DTYP, "asynInt32")
-    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SAVE_DATA")
-    field(ZNAM, "No")
-    field(ONAM, "Yes")
-}
-
-record(bi,"$(P)$(R)SaveData_RBV") {
-    field(DESC, "Save data")
-    field(DTYP, "asynInt32")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SAVE_DATA")
-    field(ZNAM, "No")
-    field(ONAM, "Yes")
-    field(SCAN, "I/O Intr")
-}
-
 # Threshold energies
 record(ao, "$(P)$(R)Threshold1")
 {
@@ -178,6 +160,88 @@ record(ai, "$(P)$(R)Threshold4_RBV")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD4")
     field(DESC, "Energy threshold")
     field(EGU,  "keV")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(ai, "$(P)$(R)ThresholdActual1_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD_ACTUAL1")
+    field(DESC, "Actual energy threshold")
+    field(EGU,  "keV")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(ai, "$(P)$(R)ThresholdActual2_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD_ACTUAL2")
+    field(DESC, "Actual energy threshold")
+    field(EGU,  "keV")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(ai, "$(P)$(R)ThresholdActual3_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD_ACTUAL3")
+    field(DESC, "Actual energy threshold")
+    field(EGU,  "keV")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(ai, "$(P)$(R)ThresholdActual4_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD_ACTUAL4")
+    field(DESC, "Actual energy threshold")
+    field(EGU,  "keV")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(longin, "$(P)$(R)ColorsCollected_RBV")
+{
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COLORS_COLLECTED")
+    field(DESC, "Colors collected")
+    field(SCAN, "I/O Intr")
+}
+
+record(longin, "$(P)$(R)UDPBuffersRead_RBV")
+{
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))UDP_BUFFERS_READ")
+    field(DESC, "UDP buffers read")
+    field(SCAN, "I/O Intr")
+}
+
+record(longin, "$(P)$(R)UDPBuffersMax_RBV")
+{
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))UDP_BUFFERS_MAX")
+    field(DESC, "UDP buffers total")
+    field(SCAN, "I/O Intr")
+}
+
+record(longin, "$(P)$(R)UDPBuffersFree_RBV")
+{
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))UDP_BUFFERS_FREE")
+    field(DESC, "UDP buffers free")
+    field(SCAN, "I/O Intr")
+}
+
+record(ai, "$(P)$(R)UDPSpeed_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))UDP_SPEED")
+    field(DESC, "UDP speed")
+    field(EGU,  "MB/s")
     field(PREC, "1")
     field(SCAN, "I/O Intr")
 }
