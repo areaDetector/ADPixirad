@@ -1,5 +1,4 @@
 $(P)$(R)CollectionMode
-$(P)$(R)SaveData
 $(P)$(R)Threshold1
 $(P)$(R)Threshold2
 $(P)$(R)Threshold3
@@ -10,6 +9,4 @@ $(P)$(R)HVMode
 $(P)$(R)SyncInPolarity
 $(P)$(R)SyncOutPolarity
 $(P)$(R)SyncOutFunction
-$(P)$(R)DownloadSpeed
-$(P)$(R)ImageFileTmot
 $(P)$(R)CoolingState
