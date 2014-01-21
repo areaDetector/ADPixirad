@@ -1,8 +1,5 @@
-Fix threshold calculations
 Documentation
-Eliminate need for udp_client.exe
-Try with DHCP
 Temperature status (OK, DP warning, DP error, Overheat)
-Add system reset
+Test system reset
 Store multi-color files as [NX, NY, NCOLORS]
-
+DTF files don't display correctly
