@@ -39,30 +39,46 @@
 /** Messages to/from server */
 #define MAX_MESSAGE_SIZE 256 
 #define SERVER_DEFAULT_TIMEOUT 1.0
-/** Additional time to wait for a server response after the acquire should be complete */ 
-#define SERVER_ACQUIRE_TIMEOUT 10.
 
-#define MAX_UDP_DATA_BUFFER     256217728
-#define MAX_UDP_PACKET_LEN           1448
-#define DEFAULT_UDP_NUM_PACKETS       360
-#define DAQ_PACKET_FRAGMENT            45
-#define AUTOCAL_DATA                 0x40
-#define AUTOCAL_NUM_PACKETS           135
-#define PACKET_ID_OFFSET                2
-#define PACKET_ID_BYTES                 2
-#define PACKET_CRC_BYTES                4
-#define PACKET_TAG_BYTES                2
-#define PACKET_TAG_OFFSET               0
-#define FRAME_HAS_ALIGN_ERRORS       0x20
-#define PACKET_SENSOR_DATA_OFFSET    (PACKET_TAG_BYTES + PACKET_ID_BYTES)
-#define PACKET_EXTRA_BYTES           (PACKET_ID_BYTES + PACKET_TAG_BYTES + PACKET_CRC_BYTES)
-#define PACKET_SENSOR_DATA_BYTES     (MAX_UDP_PACKET_LEN - PACKET_EXTRA_BYTES)
-#define PIXIEII_MODULES                 1
-#define PIXIE_THDAC_OFFSET              0
-#define DUMMY_0_OFFSET                  0
-#define PIXIE_THDAC_MASK             0x1f
-#define PIXIE_THDAC_OFFSET              0
-#define DUMMY_1_OFFSET                  8
+#define MAX_UDP_DATA_BUFFER         256217728
+#define MAX_UDP_PACKET_LEN          1448
+#define DEFAULT_UDP_NUM_PACKETS     360
+#define DAQ_PACKET_FRAGMENT         45
+#define AUTOCAL_DATA                0x40
+#define AUTOCAL_NUM_PACKETS         135
+#define PACKET_ID_OFFSET            2
+#define PACKET_ID_BYTES             2
+#define PACKET_CRC_BYTES            4
+#define PACKET_TAG_BYTES            2
+#define PACKET_TAG_OFFSET           0
+#define FRAME_HAS_ALIGN_ERRORS      0x20
+#define PACKET_SENSOR_DATA_OFFSET   (PACKET_TAG_BYTES + PACKET_ID_BYTES)
+#define PACKET_EXTRA_BYTES          (PACKET_ID_BYTES + PACKET_TAG_BYTES + PACKET_CRC_BYTES)
+#define PACKET_SENSOR_DATA_BYTES    (MAX_UDP_PACKET_LEN - PACKET_EXTRA_BYTES)
+#define PIXIEII_MODULES             1
+#define PIXIE_THDAC_OFFSET          0
+#define DUMMY_0_OFFSET              0
+#define PIXIE_THDAC_MASK            0x1f
+#define PIXIE_THDAC_OFFSET          0
+#define DUMMY_1_OFFSET              8
+
+#define NUM_THRESHOLDS              4
+#define THRESH_B_COEFF              39.3
+#define THRESH_A_COEFF              36.6
+#define EXTDAC_LSB                  0.000781
+#define VAGND                       0.6
+#define VTHMAX_UPPER_LIMIT          2200
+#define VTHMAX_LOWER_LIMIT          1000
+#define VTHMAX_DECR_STEP            1
+#define VTHMAX_MAX_ITERATIONS       2000
+#define VTH1_ACCURACY               0.001
+#define INT_DAC_STEPS               32
+
+#define INITIAL_HV_VALUE            350
+#define INITIAL_HV_STATE            HVOn
+#define INITIAL_HV_MODE             HVAuto
+#define INITIAL_COOLING_VALUE       15
+#define INITIAL_COOLING_STATE       CoolingOn
 
 /** Trigger modes */
 typedef enum {
@@ -106,13 +122,6 @@ typedef enum {
 } PixiradSyncOutFunction_t;
 static const char *PixiradSyncOutFunctionStrings[] = {"SHUTTER", "RODONE", "READ"};
 
-/** Download speed */
-typedef enum {
-    SpeedHigh,
-    SpeedLow
-} PixiradDownloadSpeed_t;
-static const char *PixiradDownloadSpeedStrings[] = {"UNMOD", "MOD"};
-
 /** Collection mode */
 typedef enum {
     CMOneColorLow,
@@ -134,6 +143,7 @@ static double thresholdFractions[] = {
 };
 
 #define PixiradCollectionModeString  "COLLECTION_MODE"
+#define PixiradSystemResetString     "SYSTEM_RESET"
 #define PixiradColorsCollectedString "COLORS_COLLECTED"
 #define PixiradUDPBuffersReadString  "UDP_BUFFERS_READ"
 #define PixiradUDPBuffersMaxString   "UDP_BUFFERS_MAX"
@@ -156,8 +166,6 @@ static double thresholdFractions[] = {
 #define PixiradSyncInPolarityString  "SYNC_IN_POLARITY"
 #define PixiradSyncOutPolarityString "SYNC_OUT_POLARITY"
 #define PixiradSyncOutFunctionString "SYNC_OUT_FUNCTION"
-#define PixiradDownloadSpeedString   "DOWNLOAD_SPEED"
-#define PixiradImageFileTmotString   "IMAGE_FILE_TMOT"
 #define PixiradCoolingStateString    "COOLING_STATE"
 #define PixiradHotTemperatureString  "HOT_TEMPERATURE"
 #define PixiradBoxTemperatureString  "BOX_TEMPERATURE"
@@ -165,24 +173,6 @@ static double thresholdFractions[] = {
 #define PixiradDewPointString        "DEW_POINT"
 #define PixiradPeltierPowerString    "PELTIER_POWER"
 #define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
-
-#define NUM_THRESHOLDS          4
-#define THRESH_B_COEFF          39.3
-#define THRESH_A_COEFF          36.6
-#define EXTDAC_LSB              0.000781
-#define VAGND                   0.6
-#define VTHMAX_UPPER_LIMIT      2200
-#define VTHMAX_LOWER_LIMIT      1000
-#define VTHMAX_DECR_STEP        1
-#define VTHMAX_MAX_ITERATIONS   2000
-#define VTH1_ACCURACY           0.001
-#define INT_DAC_STEPS           32
-
-#define INITIAL_HV_VALUE          350
-#define INITIAL_HV_STATE          HVOn
-#define INITIAL_HV_MODE           HVAuto
-#define INITIAL_COOLING_VALUE     15
-#define INITIAL_COOLING_STATE     CoolingOn
 
 /** Driver for PiXirad pixel array detectors using their server server over TCP/IP socket */
 class pixirad : public ADDriver {
@@ -205,6 +195,7 @@ public:
 protected:
     int PixiradCollectionMode;
     #define FIRST_PIXIRAD_PARAM PixiradCollectionMode
+    int PixiradSystemReset;
     int PixiradColorsCollected;
     int PixiradUDPBuffersRead;
     int PixiradUDPBuffersMax;
@@ -227,8 +218,6 @@ protected:
     int PixiradSyncInPolarity;
     int PixiradSyncOutPolarity;
     int PixiradSyncOutFunction;
-    int PixiradDownloadSpeed;
-    int PixiradImageFileTmot;
     int PixiradCoolingState;
     int PixiradHotTemperature;
     int PixiradBoxTemperature;
@@ -239,7 +228,8 @@ protected:
 
 private:                                       
     /* These are the methods that are new to this class */
-    asynStatus writeReadServer(double timeout);
+    asynStatus systemReset();
+    asynStatus writeReadServer();
     asynStatus setCoolingAndHV();
     asynStatus setThresholds();
     asynStatus doAutoCalibrate();
@@ -441,6 +431,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status = pasynOctetSyncIO->connect(commandPortName, 0, &pasynUserCommand_, NULL);
 
     createParam(PixiradCollectionModeString,  asynParamInt32,   &PixiradCollectionMode);
+    createParam(PixiradSystemResetString,     asynParamInt32,   &PixiradSystemReset);
     createParam(PixiradColorsCollectedString, asynParamInt32,   &PixiradColorsCollected);
     createParam(PixiradUDPBuffersReadString,  asynParamInt32,   &PixiradUDPBuffersRead);
     createParam(PixiradUDPBuffersMaxString,   asynParamInt32,   &PixiradUDPBuffersMax);
@@ -463,8 +454,6 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     createParam(PixiradSyncInPolarityString,  asynParamInt32,   &PixiradSyncInPolarity);
     createParam(PixiradSyncOutPolarityString, asynParamInt32,   &PixiradSyncOutPolarity);
     createParam(PixiradSyncOutFunctionString, asynParamInt32,   &PixiradSyncOutFunction);
-    createParam(PixiradDownloadSpeedString,   asynParamInt32,   &PixiradDownloadSpeed);
-    createParam(PixiradImageFileTmotString,   asynParamFloat64, &PixiradImageFileTmot);
     createParam(PixiradCoolingStateString,    asynParamInt32,   &PixiradCoolingState);
     createParam(PixiradHotTemperatureString,  asynParamFloat64, &PixiradHotTemperature);
     createParam(PixiradBoxTemperatureString,  asynParamFloat64, &PixiradBoxTemperature);
@@ -494,7 +483,6 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status |= setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE);
     status |= setIntegerParam(PixiradHVState, INITIAL_HV_STATE);
     status |= setIntegerParam(PixiradHVMode, INITIAL_HV_MODE);
-    status |= setIntegerParam(PixiradDownloadSpeed, SpeedHigh);
     status |= setIntegerParam(PixiradColorsCollected, 0);
     status |= setIntegerParam(PixiradUDPBuffersRead, 0);
     status |= setIntegerParam(PixiradUDPBuffersMax, maxDataPortBuffers_);
@@ -540,6 +528,20 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
 
 }
 
+asynStatus pixirad::systemReset()
+{
+    asynStatus status;
+
+    epicsSnprintf(toServer_, sizeof(toServer_), 
+                  "DAQ:! SYSTEM_RESET");
+    status = writeReadServer();
+    epicsThreadSleep(5.0);
+    setCoolingAndHV();
+    setSync();
+    setThresholds();
+    return status;
+}
+  
 asynStatus pixirad::setCoolingAndHV()
 {
     double coolingValue;
@@ -556,7 +558,7 @@ asynStatus pixirad::setCoolingAndHV()
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! INIT %.1f %d %.1f %d", 
                   coolingValue, coolingState, HVValue, HVState);
-    status = writeReadServer(1.0);
+    status = writeReadServer();
     return status;
 }
   
@@ -576,7 +578,7 @@ asynStatus pixirad::setSync()
                   PixiradSyncPolarityStrings[syncInPolarity],
                   PixiradSyncPolarityStrings[syncOutPolarity],
                   PixiradSyncOutFunctionStrings[syncOutFunction]);
-    status = writeReadServer(1.0);
+    status = writeReadServer();
     return status;
 }
     
@@ -617,7 +619,7 @@ asynStatus pixirad::setThresholds()
                   "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
                   thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
                   vthMax, ref, auFS, dtf, nbi);
-    status = writeReadServer(1.0);
+    status = writeReadServer();
     return status;
 }
     
@@ -627,7 +629,7 @@ asynStatus pixirad::doAutoCalibrate()
     
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! AUTOCAL");
-    status = writeReadServer(1.0);
+    status = writeReadServer();
     return status;
 }
     
@@ -639,7 +641,6 @@ asynStatus pixirad::startAcquire()
     double shutterPause;
     int collectionMode;
     int triggerMode;
-    int downloadSpeed;
     int HVMode;
     asynStatus status;
     
@@ -650,22 +651,20 @@ asynStatus pixirad::startAcquire()
     if (shutterPause < 0.) shutterPause = 0;
     getIntegerParam(PixiradCollectionMode, &collectionMode);
     getIntegerParam(ADTriggerMode, &triggerMode);
-    getIntegerParam(PixiradDownloadSpeed, &downloadSpeed);
     getIntegerParam(PixiradHVMode, &HVMode);
     setIntegerParam(ADNumImagesCounter, 0);
     setIntegerParam(PixiradColorsCollected, 0);
     setIntegerParam(PixiradUDPBuffersRead, 0);
    
     epicsSnprintf(toServer_, sizeof(toServer_), 
-                  "DAQ:! LOOP %d %d %d %s %s %s %s",
+                  "DAQ:! LOOP %d %d %d %s %s UNMOD %s",
                   numImages, 
                   (int)(acquireTime*1000),
                   int(shutterPause*1000),
                   PixiradCollectionModeStrings[collectionMode],
                   PixiradTriggerModeStrings[triggerMode],
-                  PixiradDownloadSpeedStrings[downloadSpeed],
                   PixiradHVModeStrings[HVMode]);
-    status = writeReadServer(1.0);
+    status = writeReadServer();
     return status;
 }
     
@@ -675,17 +674,18 @@ asynStatus pixirad::stopAcquire()
     
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:!!ACQUISITIONBREAK");
-    status = writeReadServer(1.0);
+    status = writeReadServer();
     return status;
 }
     
 
-asynStatus pixirad::writeReadServer(double timeout)
+asynStatus pixirad::writeReadServer()
 {
     size_t nwrite, nread;
     asynStatus status=asynSuccess;
     asynUser *pasynUser = pasynUserCommand_;
     int eomReason;
+    double timeout = SERVER_DEFAULT_TIMEOUT;
     const char *functionName="writeReadServer";
 
     status = pasynOctetSyncIO->writeRead(pasynUser, toServer_, strlen(toServer_), 
@@ -1158,6 +1158,9 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
                (function == PixiradCoolingState)) {
           status = setCoolingAndHV();
         
+    } else if (function == PixiradSystemReset) {
+        status = systemReset();
+
     } else if (function == PixiradAutoCalibrate) {
         status = doAutoCalibrate();
 
@@ -1295,7 +1298,6 @@ static void configpixiradCallFunc(const iocshArgBuf *args)
 
 static void pixiradRegister(void)
 {
-
     iocshRegister(&configpixirad, configpixiradCallFunc);
 }
 
