@@ -64,12 +64,6 @@
 #define PIXIE_THDAC_OFFSET              0
 #define DUMMY_1_OFFSET                  8
 
-/** Save data */
-typedef enum {
-    SaveDataOff,
-    SaveDataOn
-} PixiradSaveDataState_t;
-
 /** Trigger modes */
 typedef enum {
     TMInternal,
@@ -132,12 +126,27 @@ static const char *PixiradCollectionModeStrings[] = {"1COL0", "1COL1", "2COL", "
 
 static const char *driverName = "pixirad";
 
+static double thresholdFractions[] = {
+    0,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,
+    0.12,0.14,0.16,0.18,0.2,0.22,0.24,0.26,0.28,
+    0.32,0.36,0.40,0.44,0.48,0.52,0.56,0.60,
+    0.7,0.8,0.9,1.0
+};
+
 #define PixiradCollectionModeString  "COLLECTION_MODE"
-#define PixiradSaveDataString        "SAVE_DATA"
-#define PixiradThreshold1String      "THRESHOLD1"
-#define PixiradThreshold2String      "THRESHOLD2"
-#define PixiradThreshold3String      "THRESHOLD3"
-#define PixiradThreshold4String      "THRESHOLD4"
+#define PixiradColorsCollectedString "COLORS_COLLECTED"
+#define PixiradUDPBuffersReadString  "UDP_BUFFERS_READ"
+#define PixiradUDPBuffersMaxString   "UDP_BUFFERS_MAX"
+#define PixiradUDPBuffersFreeString  "UDP_BUFFERS_FREE"
+#define PixiradUDPSpeedString        "UDP_SPEED"
+#define PixiradThresh1String         "THRESHOLD1"
+#define PixiradThresh2String         "THRESHOLD2"
+#define PixiradThresh3String         "THRESHOLD3"
+#define PixiradThresh4String         "THRESHOLD4"
+#define PixiradThreshActual1String   "THRESHOLD_ACTUAL1"
+#define PixiradThreshActual2String   "THRESHOLD_ACTUAL2"
+#define PixiradThreshActual3String   "THRESHOLD_ACTUAL3"
+#define PixiradThreshActual4String   "THRESHOLD_ACTUAL4"
 #define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 #define PixiradHVValueString         "HV_VALUE"
 #define PixiradHVStateString         "HV_STATE"
@@ -157,11 +166,23 @@ static const char *driverName = "pixirad";
 #define PixiradPeltierPowerString    "PELTIER_POWER"
 #define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 
-#define INITIAL_HV_VALUE 350
-#define INITIAL_HV_STATE HVOn
-#define INITIAL_HV_MODE HVAuto
-#define INITIAL_COOLING_VALUE 15
-#define INITIAL_COOLING_STATE CoolingOn
+#define NUM_THRESHOLDS          4
+#define THRESH_B_COEFF          39.3
+#define THRESH_A_COEFF          36.6
+#define EXTDAC_LSB              0.000781
+#define VAGND                   0.6
+#define VTHMAX_UPPER_LIMIT      2200
+#define VTHMAX_LOWER_LIMIT      1000
+#define VTHMAX_DECR_STEP        1
+#define VTHMAX_MAX_ITERATIONS   2000
+#define VTH1_ACCURACY           0.001
+#define INT_DAC_STEPS           32
+
+#define INITIAL_HV_VALUE          350
+#define INITIAL_HV_STATE          HVOn
+#define INITIAL_HV_MODE           HVAuto
+#define INITIAL_COOLING_VALUE     15
+#define INITIAL_COOLING_STATE     CoolingOn
 
 /** Driver for PiXirad pixel array detectors using their server server over TCP/IP socket */
 class pixirad : public ADDriver {
@@ -184,11 +205,19 @@ public:
 protected:
     int PixiradCollectionMode;
     #define FIRST_PIXIRAD_PARAM PixiradCollectionMode
-    int PixiradSaveData;
-    int PixiradThreshold1;
-    int PixiradThreshold2;
-    int PixiradThreshold3;
-    int PixiradThreshold4;
+    int PixiradColorsCollected;
+    int PixiradUDPBuffersRead;
+    int PixiradUDPBuffersMax;
+    int PixiradUDPBuffersFree;
+    int PixiradUDPSpeed;
+    int PixiradThresh1;
+    int PixiradThresh2;
+    int PixiradThresh3;
+    int PixiradThresh4;
+    int PixiradThreshActual1;
+    int PixiradThreshActual2;
+    int PixiradThreshActual3;
+    int PixiradThreshActual4;
     int PixiradAutoCalibrate;
     int PixiradHVValue;
     int PixiradHVState;
@@ -266,7 +295,7 @@ static int convert_bit_stream_to_counts(int code_depth, unsigned short* source_m
                 destination_memory_offset[j]&= ~dout_masks[code_depth-i-1];
         }
     }
-    return(j);
+    return j;
 }
 
 static void my_bytes_swap(unsigned short* us_ptr)
@@ -279,6 +308,84 @@ static void my_bytes_swap(unsigned short* us_ptr)
     *(temp_char_ptr) = b;
 }
 
+static double get_vth_from_fit(double EnergyKev)
+{
+    // With these coefficients only one solution is positive and there is always one if EnergyKev >= 0
+    return (((-1.0) * THRESH_B_COEFF + sqrt(pow(THRESH_B_COEFF,2) + (4.0*THRESH_A_COEFF*EnergyKev))) / (2.0*THRESH_A_COEFF));
+}
+
+static double get_energy_from_fit(double Vth)
+{
+    // With these coefficients only one solution is positive and there is always one if EnergyKev >= 0
+    return ((THRESH_A_COEFF* pow(Vth,2) + THRESH_B_COEFF*Vth));
+}
+
+static double get_Vth_from_settings(int VTHMAX, double fraction)
+{
+    return ((VTHMAX*EXTDAC_LSB - 0.6)*fraction);
+}
+
+
+static int set_closest_Eth_DAC(double *allowedEth_ptr, double Eth, int *DAC, double *EthSet)
+{
+    int i;
+    double temp_double,DeltaEth;
+    i=1;
+    temp_double = fabs(allowedEth_ptr[0]-Eth);
+    do {
+        DeltaEth = fabs((allowedEth_ptr[i]-Eth));
+        if (DeltaEth <= temp_double) {
+            temp_double = DeltaEth;
+            *DAC = i; // i is the allowed energy table index and (i.e. DAC counts)
+            *EthSet = allowedEth_ptr[i];
+        }
+        i++;
+    } while (i < INT_DAC_STEPS);
+
+    return i;
+}
+
+static void calculateThresholds(double *requestedEnergy_ptr, int *VThMax_ptr, int *thresholdRegisters_ptr, double *actualEnergy_ptr)
+{
+    double DeltaVth;
+    double EthAllowedTable[INT_DAC_STEPS];
+    double temp_double;
+    int i;
+    int VThMax;
+    double Vth,Vth1;
+
+    /********************************getting Vth1*****************************************/
+    Vth1=get_vth_from_fit(requestedEnergy_ptr[0]);
+
+    /***************search for (VTHMAX, %), Vth1 Best Match*******************************/
+    VThMax=VTHMAX_UPPER_LIMIT;
+    do {
+        i=0;
+        do {
+            Vth=get_Vth_from_settings(VThMax, thresholdFractions[i]);
+            DeltaVth=fabs(Vth1-Vth);
+            i++;
+        }
+        while (DeltaVth>VTH1_ACCURACY && i<INT_DAC_STEPS);
+        VThMax-=VTHMAX_DECR_STEP;
+    }
+    while (DeltaVth>VTH1_ACCURACY && VThMax>=VTHMAX_LOWER_LIMIT);
+
+    /**********************************Set VTHMAX, DACs and Energy Threshold for fisrt color*************************************/
+    thresholdRegisters_ptr[0]=i-1; // DAC count is the fractions table index
+    actualEnergy_ptr[0]=get_energy_from_fit(Vth);
+    *VThMax_ptr=VThMax;
+
+    /**********************Filling Allowed Energy set table********************************/
+    for (i=0;i<INT_DAC_STEPS;i++) {
+        temp_double = get_Vth_from_settings(VThMax, thresholdFractions[i]);
+        EthAllowedTable[i] = (get_energy_from_fit(temp_double));
+    }
+    /***********************************Set Internal DACs and Energy Thresholds for remainings colors***************************************************/
+    for(i=1; i<NUM_THRESHOLDS; i++){
+        set_closest_Eth_DAC(EthAllowedTable, requestedEnergy_ptr[i], thresholdRegisters_ptr+i, actualEnergy_ptr+i);
+    }
+}
 
 
 /** Constructor for Pixirad driver; most parameters are simply passed to ADDriver::ADDriver.
@@ -334,11 +441,19 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status = pasynOctetSyncIO->connect(commandPortName, 0, &pasynUserCommand_, NULL);
 
     createParam(PixiradCollectionModeString,  asynParamInt32,   &PixiradCollectionMode);
-    createParam(PixiradSaveDataString,        asynParamInt32,   &PixiradSaveData);
-    createParam(PixiradThreshold1String,      asynParamFloat64, &PixiradThreshold1);
-    createParam(PixiradThreshold2String,      asynParamFloat64, &PixiradThreshold2);
-    createParam(PixiradThreshold3String,      asynParamFloat64, &PixiradThreshold3);
-    createParam(PixiradThreshold4String,      asynParamFloat64, &PixiradThreshold4);
+    createParam(PixiradColorsCollectedString, asynParamInt32,   &PixiradColorsCollected);
+    createParam(PixiradUDPBuffersReadString,  asynParamInt32,   &PixiradUDPBuffersRead);
+    createParam(PixiradUDPBuffersMaxString,   asynParamInt32,   &PixiradUDPBuffersMax);
+    createParam(PixiradUDPBuffersFreeString,  asynParamInt32,   &PixiradUDPBuffersFree);
+    createParam(PixiradUDPSpeedString,        asynParamFloat64, &PixiradUDPSpeed);
+    createParam(PixiradThresh1String,         asynParamFloat64, &PixiradThresh1);
+    createParam(PixiradThresh2String,         asynParamFloat64, &PixiradThresh2);
+    createParam(PixiradThresh3String,         asynParamFloat64, &PixiradThresh3);
+    createParam(PixiradThresh4String,         asynParamFloat64, &PixiradThresh4);
+    createParam(PixiradThreshActual1String,   asynParamFloat64, &PixiradThreshActual1);
+    createParam(PixiradThreshActual2String,   asynParamFloat64, &PixiradThreshActual2);
+    createParam(PixiradThreshActual3String,   asynParamFloat64, &PixiradThreshActual3);
+    createParam(PixiradThreshActual4String,   asynParamFloat64, &PixiradThreshActual4);
     createParam(PixiradAutoCalibrateString,   asynParamInt32,   &PixiradAutoCalibrate);
     createParam(PixiradHVValueString,         asynParamFloat64, &PixiradHVValue);
     createParam(PixiradHVStateString,         asynParamInt32,   &PixiradHVState);
@@ -380,10 +495,14 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status |= setIntegerParam(PixiradHVState, INITIAL_HV_STATE);
     status |= setIntegerParam(PixiradHVMode, INITIAL_HV_MODE);
     status |= setIntegerParam(PixiradDownloadSpeed, SpeedHigh);
-    status |= setDoubleParam(PixiradThreshold1, 10.0);
-    status |= setDoubleParam(PixiradThreshold2, 15.0);
-    status |= setDoubleParam(PixiradThreshold3, 20.0);
-    status |= setDoubleParam(PixiradThreshold4, 25.0);
+    status |= setIntegerParam(PixiradColorsCollected, 0);
+    status |= setIntegerParam(PixiradUDPBuffersRead, 0);
+    status |= setIntegerParam(PixiradUDPBuffersMax, maxDataPortBuffers_);
+    status |= setIntegerParam(PixiradUDPBuffersFree, maxDataPortBuffers_);
+    status |= setDoubleParam(PixiradThresh1, 10.0);
+    status |= setDoubleParam(PixiradThresh2, 15.0);
+    status |= setDoubleParam(PixiradThresh3, 20.0);
+    status |= setDoubleParam(PixiradThresh4, 25.0);
     status |= setIntegerParam(PixiradCollectionMode, CMOneColorLow);
     status |= setIntegerParam(PixiradSyncInPolarity, SyncPos);
     status |= setIntegerParam(PixiradSyncOutPolarity, SyncPos);
@@ -466,7 +585,7 @@ asynStatus pixirad::setThresholds()
     double thresholdEnergy[4];
     double actualThresholdEnergy[4];
     int thresholdReg[4];
-    int i, vthMax, ref=2, auFS=7;
+    int vthMax, ref=2, auFS=7;
     int collectionMode;
     asynStatus status;
     const char *dtf, *nbi;
@@ -481,23 +600,18 @@ asynStatus pixirad::setThresholds()
 
     nbi = "NBI"; 
 
-    getDoubleParam(PixiradThreshold1, &thresholdEnergy[0]);
-    getDoubleParam(PixiradThreshold2, &thresholdEnergy[1]);
-    getDoubleParam(PixiradThreshold3, &thresholdEnergy[2]);
-    getDoubleParam(PixiradThreshold4, &thresholdEnergy[3]);
+    getDoubleParam(PixiradThresh1, &thresholdEnergy[0]);
+    getDoubleParam(PixiradThresh2, &thresholdEnergy[1]);
+    getDoubleParam(PixiradThresh3, &thresholdEnergy[2]);
+    getDoubleParam(PixiradThresh4, &thresholdEnergy[3]);
     
-    // Calculate the optimum value of vthMax for the first threshold
-    vthMax = 1500;
+    // Calculate the optimum register values for the thresholds, and the actual energies
+    calculateThresholds(thresholdEnergy, &vthMax, thresholdReg, actualThresholdEnergy);
     
-    for (i=0; i<4; i++) {
-        thresholdReg[i] = (int) thresholdEnergy[i];
-        actualThresholdEnergy[i] = thresholdReg[i];
-    }
-    
-    setDoubleParam(PixiradThreshold1, actualThresholdEnergy[0]);
-    setDoubleParam(PixiradThreshold2, actualThresholdEnergy[1]);
-    setDoubleParam(PixiradThreshold3, actualThresholdEnergy[2]);
-    setDoubleParam(PixiradThreshold4, actualThresholdEnergy[3]);
+    setDoubleParam(PixiradThreshActual1, actualThresholdEnergy[0]);
+    setDoubleParam(PixiradThreshActual2, actualThresholdEnergy[1]);
+    setDoubleParam(PixiradThreshActual3, actualThresholdEnergy[2]);
+    setDoubleParam(PixiradThreshActual4, actualThresholdEnergy[3]);
     
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
@@ -539,6 +653,8 @@ asynStatus pixirad::startAcquire()
     getIntegerParam(PixiradDownloadSpeed, &downloadSpeed);
     getIntegerParam(PixiradHVMode, &HVMode);
     setIntegerParam(ADNumImagesCounter, 0);
+    setIntegerParam(PixiradColorsCollected, 0);
+    setIntegerParam(PixiradUDPBuffersRead, 0);
    
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! LOOP %d %d %d %s %s %s %s",
@@ -609,6 +725,7 @@ void pixirad::dataTask()
     NDArray *pImage;
     int imageCounter;
     int numImagesCounter;
+    int udpBuffersFree, udpBuffersMax;
     int arrayCallbacks;
     epicsTimeStamp startTime;
     int is_autocal_data, i, j ,k, code_depth;
@@ -629,6 +746,7 @@ void pixirad::dataTask()
     lock();
     getIntegerParam(ADMaxSizeX, &sizeX);
     getIntegerParam(ADMaxSizeY, &sizeY);
+    getIntegerParam(PixiradUDPBuffersMax, &udpBuffersMax);
     dims[0] = sizeX;
     dims[1] = sizeY;
     while(1) {
@@ -699,6 +817,8 @@ void pixirad::dataTask()
         getIntegerParam(ADNumImagesCounter, &numImagesCounter);
         numImagesCounter++;
         setIntegerParam(ADNumImagesCounter, numImagesCounter);
+        udpBuffersFree = udpBuffersMax - epicsMessageQueuePending(dataMessageQueueId_);
+        setIntegerParam(PixiradUDPBuffersFree, udpBuffersFree);
         /* Call the callbacks to update any changes */
         callParamCallbacks();
 
@@ -749,8 +869,9 @@ void pixirad::udpDataListenerTask()
     int this_frame_has_aligment_errors=0;
     unsigned int packet_id, local_packet_id;
     long packet_id_gap;
+    int udpBuffersRead, udpBuffersMax, udpBuffersFree;
     epicsTimeStamp timer_a, timer_b;
-    double  time_interval, MBytesPerSecond;
+    double  time_interval, udpSpeed;
     unsigned int received_packets=0;
     unsigned int id_error_packets=0;
     static const char *functionName = "udpDataListenerTask";
@@ -805,6 +926,10 @@ void pixirad::udpDataListenerTask()
             driverName, functionName, buffsize);
     }
 
+    lock();
+    getIntegerParam(PixiradUDPBuffersMax, &udpBuffersMax);
+    unlock();
+    
     while (1) {
         this_frame_has_aligment_errors=0;
         temp_NPACK = DEFAULT_UDP_NUM_PACKETS;
@@ -851,10 +976,10 @@ void pixirad::udpDataListenerTask()
 
         epicsTimeGetCurrent(&timer_b);
         time_interval = epicsTimeDiffInSeconds(&timer_b, &timer_a);
-        MBytesPerSecond = (i * MAX_UDP_PACKET_LEN) / (time_interval*1024*1024);
+        udpSpeed = (i * MAX_UDP_PACKET_LEN) / (time_interval*1024*1024);
         asynPrint(pasynUserSelf, ASYN_TRACEIO_DRIVER,
             "%s:%s: received %d packets (%d bytes each)  in %.3f s, = %.3f MB/s\n",
-            driverName, functionName, i, MAX_UDP_PACKET_LEN, time_interval, MBytesPerSecond);
+            driverName, functionName, i, MAX_UDP_PACKET_LEN, time_interval, udpSpeed);
 
         i=0;
         local_packet_id=0;
@@ -878,7 +1003,16 @@ void pixirad::udpDataListenerTask()
             local_packet_id++;
             i++;
         }
+        lock();
+        getIntegerParam(PixiradUDPBuffersRead, &udpBuffersRead);
+        udpBuffersRead++;
+        setIntegerParam(PixiradUDPBuffersRead, udpBuffersRead);
         epicsMessageQueueSend(dataMessageQueueId_, &process_buf, sizeof(&process_buf));
+        udpBuffersFree = udpBuffersMax - epicsMessageQueuePending(dataMessageQueueId_);
+        setIntegerParam(PixiradUDPBuffersFree, udpBuffersFree);
+        setDoubleParam(PixiradUDPSpeed, udpSpeed);
+        callParamCallbacks();
+        unlock();
     }
 }
 
@@ -1066,10 +1200,10 @@ asynStatus pixirad::writeFloat64(asynUser *pasynUser, epicsFloat64 value)
         (function == PixiradHVValue)) {
         status = setCoolingAndHV();
 
-    } else if ((function == PixiradThreshold1) ||
-               (function == PixiradThreshold2) ||
-               (function == PixiradThreshold3) ||
-               (function == PixiradThreshold4)) {
+    } else if ((function == PixiradThresh1) ||
+               (function == PixiradThresh2) ||
+               (function == PixiradThresh3) ||
+               (function == PixiradThresh4)) {
         status = setThresholds();
 
     } else {
