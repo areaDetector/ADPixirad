@@ -41,6 +41,11 @@ record(mbbi, "$(P)$(R)FileFormat_RBV")
     field(ONVL, "1")
 }
 
+# Set the precision of the temperature records to 1
+record(ai, "$(P)$(R)TemperatureActual") { field(PREC, "1") }
+record(ai, "$(P)$(R)Temperature_RBV")   { field(PREC, "1") }
+record(ao, "$(P)$(R)Temperature")       { field(PREC, "1") }
+
 #
 # These are the records that are new to the Pixirad driver
 #
@@ -274,6 +279,17 @@ record(bo,"$(P)$(R)SystemReset") {
     field(ONAM, "Reset")
 }
 
+record(bi,"$(P)$(R)SystemReset_RBV") {
+    field(DESC, "System reset")
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYSTEM_RESET")
+    field(ZNAM, "Done")
+    field(ZSV,  "NO_ALARM")
+    field(ONAM, "Reset")
+    field(OSV,  "MINOR")
+    field(SCAN, "I/O Intr")
+}
+
 record(ao, "$(P)$(R)HVValue")
 {
     field(PINI, "YES")
@@ -504,26 +520,28 @@ record(ai, "$(P)$(R)PeltierPower_RBV")
     field(SCAN, "I/O Intr")
 }
 
-# Timeout waiting for image to be written to file system
-record(ao, "$(P)$(R)ImageFileTmot")
-{
-    field(PINI, "YES")
-    field(DTYP, "asynFloat64")
-    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))IMAGE_FILE_TMOT")
-    field(DESC, "Timeout for image file")
-    field(VAL,  "20")
-    field(EGU,  "s")
-    field(PREC, "1")
+record(mbbi,"$(P)$(R)TempStatus_RBV") {
+    field(DESC, "Temperature status")
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))TEMP_STATUS")
+    field(ZRVL, "0")
+    field(ZRST, "OK")
+    field(ZRSV, "NO_ALARM")
+    field(ONVL, "1")
+    field(ONST, "DP Warning")
+    field(ONSV, "MINOR")
+    field(TWVL, "2")
+    field(TWST, "DP Error")
+    field(TWSV, "MAJOR")
+    field(THVL, "3")
+    field(THST, "THot warning")
+    field(THSV, "MINOR")
+    field(FRVL, "4")
+    field(FRST, "THot error")
+    field(FRSV, "MAJOR")
+    field(SCAN, "I/O Intr")
 }
 
-# asyn record for interactive communication with server
-record(asyn, "$(P)$(R)serverAsyn")
-{
-    field(PORT,  "$(SERVER_PORT)")
-    field(IMAX, "64")
-    field(OMAX, "64")
-    field(AUCT, "0")
-}
 
 # Set DISA for PVs in ADBase that do not apply to Pixirad
 
