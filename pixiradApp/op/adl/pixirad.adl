@@ -670,7 +670,7 @@ rectangle {
 		x=700
 		y=195
 		width=350
-		height=230
+		height=265
 	}
 	"basic attribute" {
 		clr=14
@@ -707,7 +707,7 @@ menu {
 	object {
 		x=940
 		y=226
-		width=60
+		width=40
 		height=18
 	}
 	monitor {
@@ -715,6 +715,7 @@ menu {
 		clr=54
 		bclr=4
 	}
+	align="horiz. right"
 	limits {
 	}
 }
@@ -750,7 +751,7 @@ text {
 	object {
 		x=940
 		y=251
-		width=60
+		width=40
 		height=18
 	}
 	monitor {
@@ -758,6 +759,7 @@ text {
 		clr=54
 		bclr=4
 	}
+	align="horiz. right"
 	limits {
 	}
 }
@@ -818,35 +820,6 @@ text {
 	}
 	textix="Hot Temp."
 	align="horiz. right"
-}
-text {
-	object {
-		x=751
-		y=400
-		width=120
-		height=20
-	}
-	"basic attribute" {
-		clr=14
-	}
-	textix="Peltier power"
-	align="horiz. right"
-}
-"text update" {
-	object {
-		x=876
-		y=401
-		width=60
-		height=18
-	}
-	monitor {
-		chan="$(P)$(R)PeltierPower_RBV"
-		clr=54
-		bclr=4
-	}
-	align="horiz. right"
-	limits {
-	}
 }
 text {
 	object {
@@ -938,7 +911,7 @@ text {
 composite {
 	object {
 		x=699
-		y=430
+		y=465
 		width=350
 		height=60
 	}
@@ -947,7 +920,7 @@ composite {
 		composite {
 			object {
 				x=823
-				y=432
+				y=467
 				width=102
 				height=21
 			}
@@ -956,7 +929,7 @@ composite {
 				rectangle {
 					object {
 						x=823
-						y=432
+						y=467
 						width=102
 						height=21
 					}
@@ -969,7 +942,7 @@ composite {
 		text {
 			object {
 				x=855
-				y=432
+				y=467
 				width=38
 				height=20
 			}
@@ -982,7 +955,7 @@ composite {
 		rectangle {
 			object {
 				x=699
-				y=430
+				y=465
 				width=350
 				height=60
 			}
@@ -994,7 +967,7 @@ composite {
 		text {
 			object {
 				x=711
-				y=459
+				y=494
 				width=38
 				height=20
 			}
@@ -1007,7 +980,7 @@ composite {
 		"text entry" {
 			object {
 				x=755
-				y=460
+				y=495
 				width=285
 				height=20
 			}
@@ -1021,47 +994,6 @@ composite {
 			}
 		}
 	}
-}
-text {
-	object {
-		x=42
-		y=570
-		width=140
-		height=20
-	}
-	"basic attribute" {
-		clr=14
-	}
-	textix="Download speed"
-	align="horiz. right"
-}
-text {
-	object {
-		x=42
-		y=595
-		width=140
-		height=20
-	}
-	"basic attribute" {
-		clr=14
-	}
-	textix="Auto calibrate"
-	align="horiz. right"
-}
-"message button" {
-	object {
-		x=186
-		y=595
-		width=80
-		height=20
-	}
-	control {
-		chan="$(P)$(R)AutoCalibrate"
-		clr=14
-		bclr=51
-	}
-	label="AutoCal"
-	press_msg="1"
 }
 text {
 	object {
@@ -1526,138 +1458,88 @@ text {
 	limits {
 	}
 }
-composite {
+"text update" {
 	object {
 		x=270
 		y=496
 		width=60
-		height=93
+		height=18
 	}
-	"composite name"=""
-	children {
-		"text update" {
-			object {
-				x=270
-				y=496
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)SyncInPolarity_RBV"
-				clr=54
-				bclr=4
-			}
-			limits {
-			}
-		}
-		"text update" {
-			object {
-				x=270
-				y=571
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)DownloadSpeed_RBV"
-				clr=54
-				bclr=4
-			}
-			limits {
-			}
-		}
-		"text update" {
-			object {
-				x=270
-				y=521
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)SyncOutPolarity_RBV"
-				clr=54
-				bclr=4
-			}
-			limits {
-			}
-		}
-		"text update" {
-			object {
-				x=270
-				y=546
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)SyncOutFunction_RBV"
-				clr=54
-				bclr=4
-			}
-			limits {
-			}
-		}
+	monitor {
+		chan="$(P)$(R)SyncInPolarity_RBV"
+		clr=54
+		bclr=4
+	}
+	limits {
 	}
 }
-composite {
+"text update" {
+	object {
+		x=270
+		y=521
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)SyncOutPolarity_RBV"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=270
+		y=546
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)SyncOutFunction_RBV"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+menu {
 	object {
 		x=186
 		y=495
 		width=80
-		height=95
+		height=20
 	}
-	"composite name"=""
-	children {
-		menu {
-			object {
-				x=186
-				y=495
-				width=80
-				height=20
-			}
-			control {
-				chan="$(P)$(R)SyncInPolarity"
-				clr=14
-				bclr=51
-			}
-		}
-		menu {
-			object {
-				x=186
-				y=570
-				width=80
-				height=20
-			}
-			control {
-				chan="$(P)$(R)DownloadSpeed"
-				clr=14
-				bclr=51
-			}
-		}
-		menu {
-			object {
-				x=186
-				y=520
-				width=80
-				height=20
-			}
-			control {
-				chan="$(P)$(R)SyncOutPolarity"
-				clr=14
-				bclr=51
-			}
-		}
-		menu {
-			object {
-				x=186
-				y=545
-				width=80
-				height=20
-			}
-			control {
-				chan="$(P)$(R)SyncOutFunction"
-				clr=14
-				bclr=51
-			}
-		}
+	control {
+		chan="$(P)$(R)SyncInPolarity"
+		clr=14
+		bclr=51
+	}
+}
+menu {
+	object {
+		x=186
+		y=520
+		width=80
+		height=20
+	}
+	control {
+		chan="$(P)$(R)SyncOutPolarity"
+		clr=14
+		bclr=51
+	}
+}
+menu {
+	object {
+		x=186
+		y=545
+		width=80
+		height=20
+	}
+	control {
+		chan="$(P)$(R)SyncOutFunction"
+		clr=14
+		bclr=51
 	}
 }
 "text update" {
@@ -1677,7 +1559,7 @@ composite {
 }
 "text update" {
 	object {
-		x=1005
+		x=985
 		y=251
 		width=20
 		height=18
@@ -2117,74 +1999,62 @@ composite {
 		}
 	}
 }
-composite {
+text {
 	object {
 		x=380
 		y=410
-		width=289
+		width=140
 		height=20
 	}
-	"composite name"=""
-	children {
-		text {
-			object {
-				x=380
-				y=410
-				width=140
-				height=20
-			}
-			"basic attribute" {
-				clr=14
-			}
-			textix="UDP buffs free/max"
-			align="horiz. right"
-		}
-		"text update" {
-			object {
-				x=525
-				y=411
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)UDPBuffersFree_RBV"
-				clr=54
-				bclr=4
-			}
-			align="horiz. right"
-			limits {
-			}
-		}
-		"text update" {
-			object {
-				x=609
-				y=411
-				width=60
-				height=18
-			}
-			monitor {
-				chan="$(P)$(R)UDPBuffersMax_RBV"
-				clr=54
-				bclr=4
-			}
-			align="horiz. right"
-			limits {
-			}
-		}
-		text {
-			object {
-				x=594
-				y=410
-				width=5
-				height=20
-			}
-			"basic attribute" {
-				clr=14
-			}
-			textix="/"
-			align="horiz. right"
-		}
+	"basic attribute" {
+		clr=14
 	}
+	textix="UDP buffs free/max"
+	align="horiz. right"
+}
+"text update" {
+	object {
+		x=525
+		y=411
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)UDPBuffersFree_RBV"
+		clr=54
+		bclr=4
+	}
+	align="horiz. right"
+	limits {
+	}
+}
+"text update" {
+	object {
+		x=609
+		y=411
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)UDPBuffersMax_RBV"
+		clr=54
+		bclr=4
+	}
+	limits {
+	}
+}
+text {
+	object {
+		x=594
+		y=410
+		width=5
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="/"
+	align="horiz. right"
 }
 text {
 	object {
@@ -2213,4 +2083,156 @@ text {
 	}
 	limits {
 	}
+}
+text {
+	object {
+		x=42
+		y=595
+		width=140
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="System reset"
+	align="horiz. right"
+}
+"message button" {
+	object {
+		x=186
+		y=595
+		width=80
+		height=20
+	}
+	control {
+		chan="$(P)$(R)SystemReset"
+		clr=14
+		bclr=20
+	}
+	label="Reset"
+	press_msg="1"
+}
+composite {
+	object {
+		x=42
+		y=570
+		width=224
+		height=20
+	}
+	"composite name"=""
+	children {
+		text {
+			object {
+				x=42
+				y=570
+				width=140
+				height=20
+			}
+			"basic attribute" {
+				clr=14
+			}
+			textix="Auto calibrate"
+			align="horiz. right"
+		}
+		"message button" {
+			object {
+				x=186
+				y=570
+				width=80
+				height=20
+			}
+			control {
+				chan="$(P)$(R)AutoCalibrate"
+				clr=14
+				bclr=51
+			}
+			label="AutoCal"
+			press_msg="1"
+		}
+	}
+}
+"text update" {
+	object {
+		x=270
+		y=596
+		width=60
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)SystemReset_RBV"
+		clr=54
+		bclr=2
+	}
+	clrmod="alarm"
+	limits {
+	}
+}
+composite {
+	object {
+		x=751
+		y=400
+		width=185
+		height=20
+	}
+	"composite name"=""
+	children {
+		"text update" {
+			object {
+				x=876
+				y=401
+				width=60
+				height=18
+			}
+			monitor {
+				chan="$(P)$(R)PeltierPower_RBV"
+				clr=54
+				bclr=4
+			}
+			align="horiz. right"
+			limits {
+			}
+		}
+		text {
+			object {
+				x=751
+				y=400
+				width=120
+				height=20
+			}
+			"basic attribute" {
+				clr=14
+			}
+			textix="Peltier power"
+			align="horiz. right"
+		}
+	}
+}
+"text update" {
+	object {
+		x=876
+		y=426
+		width=120
+		height=18
+	}
+	monitor {
+		chan="$(P)$(R)TempStatus_RBV"
+		clr=54
+		bclr=2
+	}
+	clrmod="alarm"
+	limits {
+	}
+}
+text {
+	object {
+		x=751
+		y=425
+		width=120
+		height=20
+	}
+	"basic attribute" {
+		clr=14
+	}
+	textix="Status"
+	align="horiz. right"
 }
