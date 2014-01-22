@@ -1,5 +1,1 @@
 Documentation
-Temperature status (OK, DP warning, DP error, Overheat)
-Test system reset
-Store multi-color files as [NX, NY, NCOLORS]
-DTF files don't display correctly
