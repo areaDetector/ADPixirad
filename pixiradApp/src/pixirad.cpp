@@ -32,6 +32,7 @@
 #include <epicsExport.h>
 
 #include <asynOctetSyncIO.h>
+#include <asynCommonSyncIO.h>
 
 #include "ADDriver.h"
 #include "PIXIEII_data_utilities.h"
@@ -39,6 +40,8 @@
 /** Messages to/from server */
 #define MAX_MESSAGE_SIZE 256 
 #define SERVER_DEFAULT_TIMEOUT 1.0
+
+#define DETECTOR_RESET_TIME         5.0
 
 #define MAX_UDP_DATA_BUFFER         256217728
 #define MAX_UDP_PACKET_LEN          1448
@@ -93,6 +96,15 @@ typedef enum {
     CoolingOff,
     CoolingOn
 } PixiradCoolingState_t;
+
+/** Temperature status */
+typedef enum {
+    TSOK,
+    TSDewPointWarning,
+    TSDewPointError,
+    TSOverheatWarning,
+    TSOverheatError
+} PixiradTempStatus_t;
 
 /** High voltage state */
 typedef enum {
@@ -172,6 +184,7 @@ static double thresholdFractions[] = {
 #define PixiradBoxHumidityString     "BOX_HUMIDITY"
 #define PixiradDewPointString        "DEW_POINT"
 #define PixiradPeltierPowerString    "PELTIER_POWER"
+#define PixiradTempStatusString      "TEMP_STATUS"
 #define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 
 /** Driver for PiXirad pixel array detectors using their server server over TCP/IP socket */
@@ -223,6 +236,7 @@ protected:
     int PixiradBoxTemperature;
     int PixiradBoxHumidity;
     int PixiradDewPoint;
+    int PixiradTempStatus;
     int PixiradPeltierPower;
     #define LAST_PIXIRAD_PARAM PixiradPeltierPower
 
@@ -245,6 +259,7 @@ private:
     char toServer_[MAX_MESSAGE_SIZE];
     char fromServer_[MAX_MESSAGE_SIZE];
     asynUser *pasynUserCommand_;
+    asynUser *pasynUserCommandCommon_;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
@@ -429,6 +444,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
 
     /* Connect to Pixirad server */
     status = pasynOctetSyncIO->connect(commandPortName, 0, &pasynUserCommand_, NULL);
+    status = pasynCommonSyncIO->connect(commandPortName, 0, &pasynUserCommandCommon_, NULL);
 
     createParam(PixiradCollectionModeString,  asynParamInt32,   &PixiradCollectionMode);
     createParam(PixiradSystemResetString,     asynParamInt32,   &PixiradSystemReset);
@@ -459,6 +475,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     createParam(PixiradBoxTemperatureString,  asynParamFloat64, &PixiradBoxTemperature);
     createParam(PixiradBoxHumidityString,     asynParamFloat64, &PixiradBoxHumidity);
     createParam(PixiradDewPointString,        asynParamFloat64, &PixiradDewPoint);
+    createParam(PixiradTempStatusString,      asynParamInt32,   &PixiradTempStatus);
     createParam(PixiradPeltierPowerString,    asynParamFloat64, &PixiradPeltierPower);
 
     /* Set some default values for parameters */
@@ -495,10 +512,12 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status |= setIntegerParam(PixiradSyncInPolarity, SyncPos);
     status |= setIntegerParam(PixiradSyncOutPolarity, SyncPos);
     status |= setIntegerParam(PixiradSyncOutFunction, SyncOutShutter);
+    status |= setIntegerParam(PixiradSystemReset, 0);
+    status |= setIntegerParam(PixiradTempStatus, 0);
     
     // There is a bug in the current firmware.  
     // Two different HV values must be sent or it won't accept it.
-    setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE - 1.0);
+    setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE-1.0);
     setCoolingAndHV();
     setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE);
     setCoolingAndHV();
@@ -531,14 +550,38 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
 asynStatus pixirad::systemReset()
 {
     asynStatus status;
+    double HVValue;
+    int HVState;
 
+    // Do callbacks so user sees "Reset" state of the PV
+    callParamCallbacks();
+    
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! SYSTEM_RESET");
     status = writeReadServer();
-    epicsThreadSleep(5.0);
-    setCoolingAndHV();
-    setSync();
-    setThresholds();
+
+    // Force disconnect from IP port while detector is resetting
+    status = pasynCommonSyncIO->disconnectDevice(pasynUserCommandCommon_);
+    
+    // Wait for the detector to reset
+    epicsThreadSleep(DETECTOR_RESET_TIME);
+    
+    // For reconnect to detector.  This is quicker than waiting for auto-reconnect
+    status = pasynCommonSyncIO->connectDevice(pasynUserCommandCommon_);
+
+    status = setSync();
+    status = setThresholds();
+    // There is a bug in the current firmware.  
+    // Two different HV values must be sent or it won't accept it.
+    getDoubleParam(PixiradHVValue, &HVValue);
+    setDoubleParam(PixiradHVValue, HVValue-1.0);
+    getIntegerParam(PixiradHVState, &HVState);
+    setIntegerParam(PixiradHVState, 1);
+    status = setCoolingAndHV();
+    setDoubleParam(PixiradHVValue, HVValue);
+    setIntegerParam(PixiradHVState, HVState);
+    status = setCoolingAndHV();
+    setIntegerParam(PixiradSystemReset, 0);
     return status;
 }
   
@@ -720,11 +763,15 @@ void pixirad::dataTask()
 {
     int numFrames;
     int collectionMode;
+    int colorsCollected;
     int sizeX, sizeY;
-    size_t dims[2];
-    NDArray *pImage;
+    size_t dims[3];
+    int numDims;
+    NDArray *pImage = 0;
     int imageCounter;
+    int offset;
     int numImagesCounter;
+    int numColors;
     int udpBuffersFree, udpBuffersMax;
     int arrayCallbacks;
     epicsTimeStamp startTime;
@@ -732,6 +779,8 @@ void pixirad::dataTask()
     unsigned short *local_buffer_ptr, *temp_us_ptr, *conv, *process_buf_ptr;
     unsigned short packet_tag;
     int status;
+    int CMNumColors[] = {1, 1, 2, 4, 1, 2};
+    int colorOffsetMap[] = {1, 0, 3, 2};
     static const char *functionName = "dataTask";
 
     local_buffer_ptr = (unsigned short *) calloc(PIXIEII_MODULES*MATRIX_DIM_WORDS*15, sizeof(unsigned short));
@@ -808,55 +857,75 @@ void pixirad::dataTask()
         }
 
         lock();
-        getIntegerParam(ADNumImages, &numFrames);
-        getIntegerParam(PixiradCollectionMode, &collectionMode);
-        getIntegerParam(NDArrayCallbacks, &arrayCallbacks);
-        getIntegerParam(NDArrayCounter, &imageCounter);
-        imageCounter++;
-        setIntegerParam(NDArrayCounter, imageCounter);
-        getIntegerParam(ADNumImagesCounter, &numImagesCounter);
-        numImagesCounter++;
-        setIntegerParam(ADNumImagesCounter, numImagesCounter);
         udpBuffersFree = udpBuffersMax - epicsMessageQueuePending(dataMessageQueueId_);
         setIntegerParam(PixiradUDPBuffersFree, udpBuffersFree);
-        /* Call the callbacks to update any changes */
-        callParamCallbacks();
 
-        /* Get the current time */
-        epicsTimeGetCurrent(&startTime);
-        /* Get an image buffer from the pool */
-        pImage = this->pNDArrayPool->alloc(2, dims, NDUInt16, 0, NULL);
+        getIntegerParam(PixiradCollectionMode, &collectionMode);
+        numColors = CMNumColors[collectionMode];
+        getIntegerParam(PixiradColorsCollected, &colorsCollected);
+        if (colorsCollected == 0) {
+            /* Get the current time */
+            epicsTimeGetCurrent(&startTime);
+            if (numColors == 1) {
+                numDims = 2;
+            } else {
+                numDims = 3;
+                dims[2] = numColors;
+            }
+            /* Get an image buffer from the pool */
+            pImage = this->pNDArrayPool->alloc(numDims, dims, NDUInt16, 0, NULL);
+        }
 
         /* Copy the data from the process_buf to the NDArray */
-        memcpy(pImage->pData, process_buf_ptr+PACKET_TAG_BYTES/2, MATRIX_DIM_WORDS * sizeof(unsigned short));
+        /* The images come out in order thresh2, thresh1, thresh4, thresh3 */
+        if (numColors == 1)
+            offset = 0;
+        else
+            offset = colorOffsetMap[colorsCollected] * sizeX * sizeY;
+        memcpy((unsigned short *)pImage->pData + offset, 
+               process_buf_ptr+PACKET_TAG_BYTES/2, 
+               sizeX * sizeY * sizeof(unsigned short));
 
         // Free the process_buf_ptr, no longer needed
         free(process_buf_ptr);
 
-        /* Put the frame number and time stamp into the buffer */
-        pImage->uniqueId = imageCounter;
-        pImage->timeStamp = startTime.secPastEpoch + startTime.nsec / 1.e9;
-        updateTimeStamp(&pImage->epicsTS);
+        colorsCollected++;
+        if (colorsCollected >= numColors) {
+            colorsCollected = 0;
+            getIntegerParam(NDArrayCounter, &imageCounter);
+            imageCounter++;
+            setIntegerParam(NDArrayCounter, imageCounter);
+            getIntegerParam(ADNumImagesCounter, &numImagesCounter);
+            numImagesCounter++;
+            setIntegerParam(ADNumImagesCounter, numImagesCounter);
+            /* Put the frame number and time stamp into the buffer */
+            pImage->uniqueId = imageCounter;
+            pImage->timeStamp = startTime.secPastEpoch + startTime.nsec / 1.e9;
+            updateTimeStamp(&pImage->epicsTS);
 
-        /* Get any attributes that have been defined for this driver */        
-        this->getAttributes(pImage->pAttributeList);
+            /* Get any attributes that have been defined for this driver */        
+            this->getAttributes(pImage->pAttributeList);
 
-        if (arrayCallbacks) {
-            /* Call the NDArray callback */
-            /* Must release the lock here, or we can get into a deadlock, because we can
-             * block on the plugin lock, and the plugin can be calling us */
-            unlock();
-            asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, 
-                 "%s:%s: calling NDArray callback\n", driverName, functionName);
-            doCallbacksGenericPointer(pImage, NDArrayData, 0);
-            lock();
+            getIntegerParam(NDArrayCallbacks, &arrayCallbacks);
+            if (arrayCallbacks) {
+                /* Call the NDArray callback */
+                /* Must release the lock here, or we can get into a deadlock, because we can
+                 * block on the plugin lock, and the plugin can be calling us */
+                unlock();
+                doCallbacksGenericPointer(pImage, NDArrayData, 0);
+                lock();
+            }
+            /* Free the image buffer */
+            pImage->release();
+            getIntegerParam(ADNumImages, &numFrames);
+            if (numImagesCounter >= numFrames) {
+                setIntegerParam(ADAcquire, 0);
+                callParamCallbacks();
+            }
         }
-        /* Free the image buffer */
-        pImage->release();
-        if (numImagesCounter >= numFrames) {
-            setIntegerParam(ADAcquire, 0);
-            callParamCallbacks();
-        }
+        setIntegerParam(PixiradColorsCollected, colorsCollected);
+        /* Call the callbacks to update any changes */
+        callParamCallbacks();
     }
 }
 
@@ -1030,7 +1099,8 @@ void pixirad::statusTask()
   int nRead;
   float value;
   char buffer[256];
-  double h, temperature, humidity, dewPoint;
+  double h, boxTemp, coldTemp, hotTemp, humidity, dewPoint;
+  int tempStatus;
   char *pString;
   typedef struct {
     const char* str;
@@ -1112,11 +1182,26 @@ void pixirad::statusTask()
       }
     }
     getDoubleParam(PixiradBoxHumidity, &humidity);
-    getDoubleParam(PixiradBoxTemperature, &temperature);
+    getDoubleParam(PixiradBoxTemperature, &boxTemp);
+    getDoubleParam(ADTemperatureActual, &coldTemp);
+    getDoubleParam(PixiradHotTemperature, &hotTemp);
     // Calculate the dew point (Magnus formula, e-mail from Pixirad 1/14/2014)
-    h = (log10(humidity) - 2.) / 0.4343 + (17.62 * temperature) / (243.12 + temperature);
+    h = (log10(humidity) - 2.) / 0.4343 + (17.62 * boxTemp) / (243.12 + boxTemp);
     dewPoint = 243.12 * h / (17.62 - h); 
     setDoubleParam(PixiradDewPoint, dewPoint);
+    
+    // Check for status problems
+    tempStatus = TSOK;
+    if (coldTemp <= (dewPoint + 3.0)) tempStatus = TSDewPointWarning;
+    if (coldTemp <= dewPoint) tempStatus = TSDewPointError;
+    if (hotTemp >= 30.0) tempStatus = TSOverheatWarning;
+    if (hotTemp >= 40.0) tempStatus = TSOverheatError;
+    setIntegerParam(PixiradTempStatus, tempStatus);
+    if ((tempStatus == TSDewPointError) ||
+        (tempStatus == TSOverheatError)) {
+        setIntegerParam(PixiradCoolingState, CoolingOff);
+        setCoolingAndHV();
+    }
     callParamCallbacks();
   }
 }
