@@ -21,7 +21,7 @@ drvAsynIPPortConfigure("$(COMMAND_PORT)","192.168.0.1:2222 HTTP", 0, 0, 0)
 #drvAsynIPPortConfigure("$(COMMAND_PORT)","164.54.160.210:2222 HTTP", 0, 0, 0)
 asynOctetSetOutputEos($(COMMAND_PORT), 0, "\n")
 asynSetTraceIOMask($(COMMAND_PORT), 0, 2)
-asynSetTraceMask($(COMMAND_PORT), 0, 9)
+#asynSetTraceMask($(COMMAND_PORT), 0, 9)
 
 pixiradConfig("$(PORT)", "$(COMMAND_PORT)", "$(DATA_PORT)", "$(STATUS_PORT)", $(DATA_PORT_BUFFERS), $(XSIZE), $(YSIZE))
 asynSetTraceIOMask($(PORT), 0, 2)
