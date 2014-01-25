@@ -41,6 +41,14 @@
 #define MAX_MESSAGE_SIZE 256 
 #define SERVER_DEFAULT_TIMEOUT 1.0
 
+// Environmental warning and error thresholds
+#define DEW_POINT_WARNING           3     // Temperature difference of TCold and DewPoint for warning
+#define DEW_POINT_ERROR             0     // Temperature difference of TCold and DewPoint for error and shutoff cooling
+#define THOT_WARNING                30
+#define THOT_ERROR                  40
+#define TCOLD_WARNING               30
+#define TCOLD_ERROR                 40
+
 #define DETECTOR_RESET_TIME         5.0
 
 #define MAX_UDP_DATA_BUFFER         256217728
@@ -102,8 +110,10 @@ typedef enum {
     TSOK,
     TSDewPointWarning,
     TSDewPointError,
-    TSOverheatWarning,
-    TSOverheatError
+    TSTHotWarning,
+    TSTHotError,
+    TSTColdWarning,
+    TSTColdError
 } PixiradTempStatus_t;
 
 /** High voltage state */
@@ -1192,13 +1202,17 @@ void pixirad::statusTask()
     
     // Check for status problems
     tempStatus = TSOK;
-    if (coldTemp <= (dewPoint + 3.0)) tempStatus = TSDewPointWarning;
-    if (coldTemp <= dewPoint) tempStatus = TSDewPointError;
-    if (hotTemp >= 30.0) tempStatus = TSOverheatWarning;
-    if (hotTemp >= 40.0) tempStatus = TSOverheatError;
+    if (coldTemp <= (dewPoint + DEW_POINT_WARNING)) tempStatus = TSDewPointWarning;
+    if (coldTemp <= (dewPoint + DEW_POINT_ERROR))   tempStatus = TSDewPointError;
+    if (hotTemp >= THOT_WARNING)                    tempStatus = TSTHotWarning;
+    if (hotTemp >= THOT_ERROR)                      tempStatus = TSTHotError;
+    if (coldTemp >= TCOLD_WARNING)                  tempStatus = TSTColdWarning;
+    if (coldTemp >= TCOLD_ERROR)                    tempStatus = TSTColdError;
     setIntegerParam(PixiradTempStatus, tempStatus);
     if ((tempStatus == TSDewPointError) ||
-        (tempStatus == TSOverheatError)) {
+        (tempStatus == TSTHotError)     ||
+        (tempStatus == TSTColdError)) 
+    {
         setIntegerParam(PixiradCoolingState, CoolingOff);
         setCoolingAndHV();
     }
