@@ -2,7 +2,7 @@
 # Mark Rivers
 # Jan. 9, 2014
 
-# We redefine the states for the TriggerMode records defined in ADBase.template
+# We redefine the states for the TriggerMode and FrameType records defined in ADBase.template
 record(mbbo,"$(P)$(R)TriggerMode") {
     field(DESC,"Acquire mode")
     field(ZRVL,"0")
@@ -24,21 +24,34 @@ record(mbbi,"$(P)$(R)TriggerMode_RBV") {
     field(TWST,"Bulb")
 }
 
-# We redefine the states for the FileFormat records defined in NDFile.template
-record(mbbo, "$(P)$(R)FileFormat")
-{
-    field(ZRST, "Raw")
+record(mbbo,"$(P)$(R)FrameType") {
     field(ZRVL, "0")
-    field(ONST, "Invalid")
+    field(ZRST, "1 color low")
     field(ONVL, "1")
+    field(ONST, "1 color high")
+    field(TWVL, "2")
+    field(TWST, "2 color")
+    field(THVL, "3")
+    field(THST, "4 color")
+    field(FRVL, "4")
+    field(FRST, "1 color DTF")
+    field(FVVL, "5")
+    field(FVST, "2 color DTF")
 }
 
-record(mbbi, "$(P)$(R)FileFormat_RBV")
-{
-    field(ZRST, "Raw")
+record(mbbi,"$(P)$(R)FrameType_RBV") {
     field(ZRVL, "0")
-    field(ONST, "Invalid")
+    field(ZRST, "1 color low")
     field(ONVL, "1")
+    field(ONST, "1 color high")
+    field(TWVL, "2")
+    field(TWST, "2 color")
+    field(THVL, "3")
+    field(THST, "4 color")
+    field(FRVL, "4")
+    field(FRST, "1 color DTF")
+    field(FVVL, "5")
+    field(FVST, "2 color DTF")
 }
 
 # Set the precision of the temperature records to 1
@@ -49,44 +62,6 @@ record(ao, "$(P)$(R)Temperature")       { field(PREC, "1") }
 #
 # These are the records that are new to the Pixirad driver
 #
-record(mbbo,"$(P)$(R)CollectionMode") {
-    field(DESC, "Collection mode")
-    field(PINI, "YES")
-    field(DTYP, "asynInt32")
-    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COLLECTION_MODE")
-    field(ZRVL, "0")
-    field(ZRST, "1 color low")
-    field(ONVL, "1")
-    field(ONST, "1 color high")
-    field(TWVL, "2")
-    field(TWST, "2 color")
-    field(THVL, "3")
-    field(THST, "4 color")
-    field(FRVL, "4")
-    field(FRST, "1 color DTF")
-    field(FVVL, "5")
-    field(FVST, "2 color DTF")
-}
-
-record(mbbi,"$(P)$(R)CollectionMode_RBV") {
-    field(DESC, "Collection mode")
-    field(DTYP, "asynInt32")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COLLECTION_MODE")
-    field(ZRVL, "0")
-    field(ZRST, "1 color low")
-    field(ONVL, "1")
-    field(ONST, "1 color high")
-    field(TWVL, "2")
-    field(TWST, "2 color")
-    field(THVL, "3")
-    field(THST, "4 color")
-    field(FRVL, "4")
-    field(FRST, "1 color DTF")
-    field(FVVL, "5")
-    field(FVST, "2 color DTF")
-    field(SCAN, "I/O Intr")
-}
-
 # Threshold energies
 record(ao, "$(P)$(R)Threshold1")
 {
@@ -254,7 +229,7 @@ record(ai, "$(P)$(R)UDPSpeed_RBV")
     field(SCAN, "I/O Intr")
 }
 
-record(bo,"$(P)$(R)AutoCalibrate") {
+record(busy,"$(P)$(R)AutoCalibrate") {
     field(DESC, "Auto calibrate")
     field(DTYP, "asynInt32")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))AUTO_CALIBRATE")
@@ -262,32 +237,12 @@ record(bo,"$(P)$(R)AutoCalibrate") {
     field(ONAM, "Calibrate")
 }
 
-record(bi,"$(P)$(R)AutoCalibrate_RBV") {
-    field(DESC, "Auto calibrate")
-    field(DTYP, "asynInt32")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))AUTO_CALIBRATE")
-    field(ZNAM, "Done")
-    field(ONAM, "Calibrate")
-    field(SCAN, "I/O Intr")
-}
-
-record(bo,"$(P)$(R)SystemReset") {
+record(busy,"$(P)$(R)SystemReset") {
     field(DESC, "System reset")
     field(DTYP, "asynInt32")
     field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYSTEM_RESET")
     field(ZNAM, "Done")
     field(ONAM, "Reset")
-}
-
-record(bi,"$(P)$(R)SystemReset_RBV") {
-    field(DESC, "System reset")
-    field(DTYP, "asynInt32")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYSTEM_RESET")
-    field(ZNAM, "Done")
-    field(ZSV,  "NO_ALARM")
-    field(ONAM, "Reset")
-    field(OSV,  "MINOR")
-    field(SCAN, "I/O Intr")
 }
 
 record(ao, "$(P)$(R)HVValue")
@@ -434,24 +389,6 @@ record(mbbi,"$(P)$(R)SyncOutFunction_RBV") {
     field(SCAN, "I/O Intr")
 }
 
-record(bo,"$(P)$(R)DownloadSpeed") {
-    field(DESC, "Download speed")
-    field(PINI, "YES")
-    field(DTYP, "asynInt32")
-    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))DOWNLOAD_SPEED")
-    field(ZNAM, "Fast")
-    field(ONAM, "Slow")
-}
-
-record(bi,"$(P)$(R)DownloadSpeed_RBV") {
-    field(DESC, "Download speed")
-    field(DTYP, "asynInt32")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))DOWNLOAD_SPEED")
-    field(ZNAM, "Fast")
-    field(ONAM, "Slow")
-    field(SCAN, "I/O Intr")
-}
-
 record(bo,"$(P)$(R)CoolingState") {
     field(DESC, "Cooling state")
     field(PINI, "YES")
@@ -520,10 +457,10 @@ record(ai, "$(P)$(R)PeltierPower_RBV")
     field(SCAN, "I/O Intr")
 }
 
-record(mbbi,"$(P)$(R)TempStatus_RBV") {
+record(mbbi,"$(P)$(R)CoolingStatus_RBV") {
     field(DESC, "Temperature status")
     field(DTYP, "asynInt32")
-    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))TEMP_STATUS")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COOLING_STATUS")
     field(ZRVL, "0")
     field(ZRST, "OK")
     field(ZRSV, "NO_ALARM")
@@ -534,16 +471,16 @@ record(mbbi,"$(P)$(R)TempStatus_RBV") {
     field(TWST, "Dew Pt Error")
     field(TWSV, "MAJOR")
     field(THVL, "3")
-    field(THST, "T Hot warning")
+    field(THST, "T Hot Warning")
     field(THSV, "MINOR")
     field(FRVL, "4")
-    field(FRST, "T Hot error")
+    field(FRST, "T Hot Error")
     field(FRSV, "MAJOR")
     field(FVVL, "5")
-    field(FVST, "T Cold warning")
+    field(FVST, "T Cold Warning")
     field(FVSV, "MINOR")
     field(SXVL, "6")
-    field(SXST, "T Cold error")
+    field(SXST, "T Cold Error")
     field(SXSV, "MAJOR")
     field(SCAN, "I/O Intr")
 }
