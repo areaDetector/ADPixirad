@@ -8,6 +8,8 @@ documentation.html
 envPaths*
 cdCommands
 dllPath.bat
-auto_settings*
+auto_settings.sav*
 configure/*.local
 O.*/
+*~
+*.swp
