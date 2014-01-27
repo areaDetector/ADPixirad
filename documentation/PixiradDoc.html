@@ -800,16 +800,15 @@
     The following measurements were done to demonstrate the performance that can be
     obtained with the areaDetector Pixirad driver. The timings were done by measuring
     the frequency of the Sync Out signal on an oscilloscope. The SyncOutFunction was
-    "Shutter" and 1000 frames were collected.</p>
+    "Shutter" and 1000 frames were collected.
+  </p>
   <table border="1" cellpadding="2" cellspacing="2" style="text-align: left">
     <tbody>
       <tr>
         <th>
           FrameType</th>
         <th>
-          TriggerMode</th>
-        <th>
-          AcquireTime (or external trigger period</th>
+          AcquireTime</th>
         <th>
           Frames/sec</th>
       </tr>
@@ -817,14 +816,184 @@
         <td>
           1 color low</td>
         <td>
-          Internal </td>
+          0.02 </td>
+        <td>
+          35.7 </td>
+      </tr>
+      <tr>
+        <td>
+          1 color low</td>
         <td>
           0.01 </td>
         <td>
-          50.0 </td>
+          57.4</td>
+      </tr>
+      <tr>
+        <td>
+          1 color low</td>
+        <td>
+          0.01 </td>
+        <td>
+          57.4</td>
+      </tr>
+      <tr>
+        <td>
+          1 color low</td>
+        <td>
+          0.005 </td>
+        <td>
+          83.3</td>
+      </tr>
+      <tr>
+        <td>
+          1 color low</td>
+        <td>
+          0.001 </td>
+        <td>
+          125.0</td>
+      </tr>
+      <tr>
+        <td>
+          1 color DTF</td>
+        <td>
+          0.02 </td>
+        <td>
+          47.3</td>
+      </tr>
+      <tr>
+        <td>
+          1 color DTF</td>
+        <td>
+          0.01 </td>
+        <td>
+          93.8</td>
+      </tr>
+      <tr>
+        <td>
+          1 color DTF</td>
+        <td>
+          0.005 </td>
+        <td>
+          143.0</td>
+      </tr>
+      <tr>
+        <td>
+          1 color DTF</td>
+        <td>
+          0.001 </td>
+        <td>
+          143.0</td>
+      </tr>
+      <tr>
+        <td>
+          2 color</td>
+        <td>
+          0.02 </td>
+        <td>
+          28.5</td>
+      </tr>
+      <tr>
+        <td>
+          2 color</td>
+        <td>
+          0.01 </td>
+        <td>
+          41</td>
+      </tr>
+      <tr>
+        <td>
+          2 color</td>
+        <td>
+          0.005 </td>
+        <td>
+          52</td>
+      </tr>
+      <tr>
+        <td>
+          2 color</td>
+        <td>
+          0.001 </td>
+        <td>
+          66</td>
+      </tr>
+      <tr>
+        <td>
+          2 color DTF</td>
+        <td>
+          0.02 </td>
+        <td>
+          23.4</td>
+      </tr>
+      <tr>
+        <td>
+          2 color DTF</td>
+        <td>
+          0.01 </td>
+        <td>
+          46</td>
+      </tr>
+      <tr>
+        <td>
+          2 color DTF</td>
+        <td>
+          0.005 </td>
+        <td>
+          71</td>
+      </tr>
+      <tr>
+        <td>
+          2 color DTF</td>
+        <td>
+          0.001 </td>
+        <td>
+          71</td>
+      </tr>
+      <tr>
+        <td>
+          4 color</td>
+        <td>
+          0.02 </td>
+        <td>
+          14.3</td>
+      </tr>
+      <tr>
+        <td>
+          4 color</td>
+        <td>
+          0.01 </td>
+        <td>
+          20</td>
+      </tr>
+      <tr>
+        <td>
+          4 color</td>
+        <td>
+          0.005 </td>
+        <td>
+          26</td>
+      </tr>
+      <tr>
+        <td>
+          4 color</td>
+        <td>
+          0.001 </td>
+        <td>
+          33</td>
       </tr>
     </tbody>
   </table>
+  <p>
+    The measurements above were made with TriggerMode=Internal. Additional measurements
+    made using TriggerMode=External showed that the maximum frame rate was the same
+    as that shown in the table, i.e. as soon as the external trigger frequency exceeded
+    this value the detector ignored every second external trigger pulse.</p>
+  <p>
+    The data above show that the detector overhead is about 7.5 ms in "1 color low";
+    mode. In "1 color DTF"; mode the overhead is about 0.7 ms, but with a minimum frame
+    period of 7 ms. In "2 color" mode the overhead is 15 ms, or 7.5 ms per image, the
+    same as in "1 color low". In "4 color" mode two exposures are required. The total
+    time is equal to AcquireTime*2 + 0.0075*4, so again the overhead is about 7.5 ms
+    per image.</p>
   <h2 id="Restrictions">
     Restrictions</h2>
   <p>
@@ -849,6 +1018,14 @@
       the detector abort it. There is a command that can be sent to the detector to abort
       an acquisition, but unfortunately this causes the detector to malfunction for subsequent
       acquisitions.</li>
+    <li>The detector does not send UDP status packets during acquisition. If the HVMode=Auto
+      and HVState=Off, which is a normal way to operate, then the HVActual readback will
+      be 0 during acquisition, because no status update happens after the high voltage
+      is automatically turned on at the start of acquisition. Immediately upon completion
+      of acquisition the status updates begin, and a few non-zero values will be observed
+      as the high voltage ramps down. This is normal, but it may cause confusion, since
+      it appears that the high voltage has not been turned on during acquisition, when
+      actually it was.</li>
   </ul>
 </body>
 </html>
