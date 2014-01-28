@@ -10,7 +10,7 @@
     <h1>
       areaDetector Pixirad driver</h1>
     <h2>
-      January 25, 2014</h2>
+      January 28, 2014</h2>
     <h2>
       Mark Rivers</h2>
     <h2>
@@ -35,10 +35,10 @@
       PiXirad</a>.
   </p>
   <p>
-    The Pixirad detector is a pixel array detector with a cadmium zinc teluride (CZT)
-    sensor, so it has high efficiency at high energy. The base module is 476 x 512 pixels,
-    which is what this driver currently supports. Detectors with more than one base
-    module are available, and will be supported by this driver in the future.</p>
+    The Pixirad detector is a pixel array detector with a cadmium teluride (CdTe) sensor,
+    so it has high efficiency at high energy. The base module is 476 x 512 pixels, which
+    is what this driver currently supports. Detectors with more than one base module
+    are available, and will be supported by this driver in the future.</p>
   <p>
     The detector does photon counting of all photons above a programmable energy threshold.
     The detector hardware has 2 energy thresholds and two counters per pixel, so it
@@ -116,9 +116,9 @@
             <li>"1 color high". One color image using threshold 2.</li>
             <li>"2 color". Two color image using thesholds 1 and 2.</li>
             <li>"4 color". Four color image using thesholds 1, 2, 3, and 4.</li>
-            <li>"1 color DTF". One color deadtime-free image using thesholds 1 and 2.</li>
-            <li>"2 color DTF". Two color deadtime-free image using thesholds 1 and 2 for color
-              1, and thresholds 3 and 4 for color 2.</li>
+            <li>"1 color DTF". One color deadtime-free image using theshold 1.</li>
+            <li>"2 color DTF". Two color deadtime-free image using theshold 1 for color 1, and
+              threshold 3 for color 2.</li>
           </ul>
           Note that the dimensions of the NDArrays from the Pixirad driver depend on the value
           of FrameType.<br />
@@ -345,8 +345,8 @@
           the dew point.<br />
           2 - "Dew Pt Error" This means that the cold temperature is less than or equal to
           the dew point.<br />
-          3 - "T Hot Warning" This means that the hot temperature is greater than 30 C.<br />
-          4 - "T Hot Error" This means that the hot temperature is greater than 40 C.<br />
+          3 - "T Hot Warning" This means that the hot temperature is greater than 40 C.<br />
+          4 - "T Hot Error" This means that the hot temperature is greater than 50 C.<br />
           5 - "T Cold Warning" This means that the cold temperature is greater than 30 C.<br />
           6 - "T Cold Error" This means that the cold temperature is greater than 40 C.<br />
           <br />
@@ -708,11 +708,13 @@
         <td>
           Sends a command to the detector to perform an autocalibration. The detector makes
           adjustments to achieve uniform pixel response. This operation <b>must</b> be performed
-          at least once after the detector is power-cycled. If autocalibration has not been
-          performed then there will be many "hot" (non-zero) pixels in the image with no x-rays.
-          When an autocalibration is performed the detector sends 2 images, one collected
-          before the calibration and one after the calibration. These images always have a
-          range of 0-31 counts and show the correction applied to each pixel.</td>
+          at least once after the detector is power-cycled, and whenever necessary as the
+          chip temperature and/or supply voltages may drift with time & environmental conditions.
+          If autocalibration has not been performed then there will be many "hot" (non-zero)
+          pixels in the image with no x-rays. When an autocalibration is performed the detector
+          sends 2 images, one collected before the calibration and one after the calibration.
+          These images always have a range of 0-31 counts and show the correction applied
+          to each pixel.</td>
         <td>
           AUTO_CALIBRATE</td>
         <td>
