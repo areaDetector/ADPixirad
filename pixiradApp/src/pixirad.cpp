@@ -44,8 +44,8 @@
 // Environmental warning and error thresholds
 #define DEW_POINT_WARNING           3     // Temperature difference of TCold and DewPoint for warning
 #define DEW_POINT_ERROR             0     // Temperature difference of TCold and DewPoint for error and shutoff cooling
-#define THOT_WARNING                30
-#define THOT_ERROR                  40
+#define THOT_WARNING                40
+#define THOT_ERROR                  50
 #define TCOLD_WARNING               30
 #define TCOLD_ERROR                 40
 
@@ -656,7 +656,7 @@ asynStatus pixirad::setThresholds()
     else
         dtf = "NODTF";
 
-    nbi = "NBI"; 
+    nbi = "NONBI"; 
 
     getDoubleParam(PixiradThresh1, &thresholdEnergy[0]);
     getDoubleParam(PixiradThresh2, &thresholdEnergy[1]);
@@ -1265,9 +1265,12 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
                (function == PixiradSyncOutFunction)) {
         status = setSync();
 
+    } else if (function == ADFrameType) {
+        status = setThresholds();
+        
     } else if ((function == PixiradHVState) ||
                (function == PixiradCoolingState)) {
-          status = setCoolingAndHV();
+        status = setCoolingAndHV();
         
     } else if (function == PixiradSystemReset) {
         status = systemReset();
