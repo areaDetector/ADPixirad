@@ -643,7 +643,7 @@ asynStatus pixirad::setThresholds()
     double thresholdEnergy[4];
     double actualThresholdEnergy[4];
     int thresholdReg[4];
-    int vthMax, ref=2, auFS=7;
+    int vthMax, ref=1, auFS=7;
     int frameType;
     asynStatus status;
     const char *dtf, *nbi;
