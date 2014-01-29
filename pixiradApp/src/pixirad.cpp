@@ -253,7 +253,7 @@ private:
     asynStatus systemReset();
     asynStatus writeReadServer();
     asynStatus setCoolingAndHV();
-    asynStatus setThresholds();
+    asynStatus setThresholds(int ref);
     asynStatus doAutoCalibrate();
     asynStatus setSync();
     asynStatus startAcquire();
@@ -583,7 +583,7 @@ asynStatus pixirad::systemReset()
     status = pasynCommonSyncIO->connectDevice(pasynUserCommandCommon_);
 
     status = setSync();
-    status = setThresholds();
+    status = setThresholds(1);
     // There is a bug in the current firmware.  
     // Two different HV values must be sent or it won't accept it.
     getDoubleParam(PixiradHVValue, &HVValue);
@@ -638,12 +638,12 @@ asynStatus pixirad::setSync()
     return status;
 }
     
-asynStatus pixirad::setThresholds()
+asynStatus pixirad::setThresholds(int ref)
 {
     double thresholdEnergy[4];
     double actualThresholdEnergy[4];
     int thresholdReg[4];
-    int vthMax, ref=1, auFS=7;
+    int vthMax, auFS=7;
     int frameType;
     asynStatus status;
     const char *dtf, *nbi;
@@ -686,9 +686,13 @@ asynStatus pixirad::doAutoCalibrate()
     setIntegerParam(ADNumImagesCounter, 0);
     setIntegerParam(PixiradColorsCollected, 0);
     setIntegerParam(PixiradUDPBuffersRead, 0);
+    // Need to set REF=0 before doing autocalibrate
+    setThresholds(0);
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "DAQ:! AUTOCAL");
     status = writeReadServer();
+    // Set REF=1 after autocalibrate
+    setThresholds(1);
     return status;
 }
     
@@ -1266,7 +1270,7 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
         status = setSync();
 
     } else if (function == ADFrameType) {
-        status = setThresholds();
+        status = setThresholds(1);
         
     } else if ((function == PixiradHVState) ||
                (function == PixiradCoolingState)) {
@@ -1321,7 +1325,7 @@ asynStatus pixirad::writeFloat64(asynUser *pasynUser, epicsFloat64 value)
                (function == PixiradThresh2) ||
                (function == PixiradThresh3) ||
                (function == PixiradThresh4)) {
-        status = setThresholds();
+        status = setThresholds(1);
 
     } else {
         /* If this parameter belongs to a base class call its method */
