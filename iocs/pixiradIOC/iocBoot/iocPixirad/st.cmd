@@ -44,4 +44,4 @@ set_requestfile_path("$(ADPIXIRAD)/pixiradApp/Db")
 iocInit()
 
 # save things every thirty seconds
-create_monitor_set("auto_settings.req", 30,"P=$(PREFIX),D=cam1:")
+create_monitor_set("auto_settings.req", 30,"P=$(PREFIX)")
