@@ -29,13 +29,13 @@
 #include <epicsMutex.h>
 #include <osiSock.h>
 #include <iocsh.h>
-#include <epicsExport.h>
 
 #include <asynOctetSyncIO.h>
 #include <asynCommonSyncIO.h>
 
 #include "ADDriver.h"
 #include "PIXIEII_data_utilities.h"
+#include <epicsExport.h>
 
 /** Messages to/from server */
 #define MAX_MESSAGE_SIZE 256 
