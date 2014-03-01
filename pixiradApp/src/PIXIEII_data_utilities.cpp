@@ -221,7 +221,7 @@ void check_data_consistency(unsigned short*data_buffer,unsigned short test_patte
     percentage_total_failed_channels=(double)total_failed_channels*100/(PIXIE_COLS*PIXIE_ROWS);
     for (i=0;i<PIXIE_DOUTS-1;i++)
         percentage_partial_failed_channels[i]=(double)partial_failed_channels[i]*100/(COLS_PER_DOUT*PIXIE_ROWS);
-    percentage_partial_failed_channels[PIXIE_DOUTS]=
+    percentage_partial_failed_channels[PIXIE_DOUTS-1]=
         (double)partial_failed_channels[PIXIE_DOUTS-1]*100/(COLS_PER_DOUT_LAST_SECTOR*PIXIE_ROWS);
     printf("\r\n\t Found a total of\t%3.2f%%\tbad readings", percentage_total_failed_channels);
     for(i=0;i<PIXIE_DOUTS;i++)
