@@ -20,6 +20,7 @@ Release Notes
 =============
 
 R2-1 (16-April-2015)
+----
 * Changes for compatibility with ADCore R2-2.
 
 
