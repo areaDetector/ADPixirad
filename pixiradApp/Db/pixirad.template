@@ -2,6 +2,8 @@
 # Mark Rivers
 # Jan. 9, 2014
 
+include "ADBase.template"
+
 # We redefine the states for the TriggerMode and FrameType records defined in ADBase.template
 record(mbbo,"$(P)$(R)TriggerMode") {
     field(DESC,"Acquire mode")
