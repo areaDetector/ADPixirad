@@ -19,6 +19,10 @@ files respectively, in the configure/ directory of the appropriate release of th
 Release Notes
 =============
 
-R2-0
+R2-1 (16-April-2015)
+* Changes for compatibility with ADCore R2-2.
+
+
+R2-0 (4-April-2014)
 ----
 * New driver added in this release.
