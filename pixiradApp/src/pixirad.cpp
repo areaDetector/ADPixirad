@@ -53,10 +53,8 @@
 
 #define MAX_UDP_DATA_BUFFER         256217728
 #define MAX_UDP_PACKET_LEN          1448
-#define DEFAULT_UDP_NUM_PACKETS     360
 #define DAQ_PACKET_FRAGMENT         45
 #define AUTOCAL_DATA                0x40
-#define AUTOCAL_NUM_PACKETS         135
 #define PACKET_ID_OFFSET            2
 #define PACKET_ID_BYTES             2
 #define PACKET_CRC_BYTES            4
@@ -268,6 +266,8 @@ private:
     char fromServer_[MAX_MESSAGE_SIZE];
     asynUser *pasynUserCommand_;
     asynUser *pasynUserCommandCommon_;
+    int numUDPPackets_;
+    int numAutocalUDPPackets_;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
@@ -535,6 +535,51 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE);
     setCoolingAndHV();
     
+    // Set the NumUDPPackets and NumAutocalUDPPackets based on detector size
+    switch (maxSizeX) {
+        case 476:
+            switch (maxSizeY) {
+                case 512:
+                    numUDPPackets_ = 360;
+                    numAutocalUDPPackets_ = 135;
+                    break;
+                case 1024:
+                    numUDPPackets_ = 720;
+                    numAutocalUDPPackets_ = 135;
+                    break;
+                case 4096:
+                    numUDPPackets_ = 2539;
+                    numAutocalUDPPackets_ = 135;
+                    break;
+                default:
+                    printf("%s::%s Illegal maxSizeY=%d\n", 
+                        driverName, functionName, maxSizeY);
+                    break;
+            }
+        case 402:
+            switch (maxSizeY) {
+                case 512:
+                    numUDPPackets_ = 270;
+                    numAutocalUDPPackets_ = 180;
+                    break;
+                case 1024:
+                    numUDPPackets_ = 540;
+                    numAutocalUDPPackets_ = 360;
+                    break;
+                case 4096:
+                    numUDPPackets_ = 2539;
+                    numAutocalUDPPackets_ = 135;
+                    break;
+                default:
+                    printf("%s::%s Illegal maxSizeY=%d\n", 
+                        driverName, functionName, maxSizeY);
+                    break;
+            }
+        default:
+            printf("%s::%s Illegal maxSizeX=%d\n", 
+                    driverName, functionName, maxSizeX);
+    }        
+ 
     if (status) {
         printf("%s:%s: unable to set camera parameters\n", driverName, functionName);
         return;
@@ -971,7 +1016,7 @@ void pixirad::udpDataListenerTask()
     unsigned int id_error_packets=0;
     static const char *functionName = "udpDataListenerTask";
     unsigned char *process_buf;
-    unsigned char *buf = (unsigned char*) calloc(MAX_UDP_PACKET_LEN * DEFAULT_UDP_NUM_PACKETS, sizeof(unsigned short));
+    unsigned char *buf = (unsigned char*) calloc(MAX_UDP_PACKET_LEN * numUDPPackets_, sizeof(unsigned short));
 
     if ((data_udp_sock_fd = epicsSocketCreate(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
@@ -1027,12 +1072,15 @@ void pixirad::udpDataListenerTask()
     
     while (1) {
         this_frame_has_aligment_errors=0;
-        temp_NPACK = DEFAULT_UDP_NUM_PACKETS;
+        temp_NPACK = numUDPPackets_;
         i=0;
         while(i < temp_NPACK ) {
             j = 0;
             while(j < DAQ_PACKET_FRAGMENT) {
                 received_bytes=recvfrom(data_udp_sock_fd, (char*) buf+(i*MAX_UDP_PACKET_LEN), MAX_UDP_PACKET_LEN, 0, NULL, 0);
+                asynPrint(pasynUserSelf, ASYN_TRACEIO_DRIVER,
+                    "%s:%s: received %d byte packet, i=%d, j=%d\n",
+                    driverName, functionName, received_bytes, i, j);
                 if (received_bytes == -1) {
                     asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
                         "%s:%s: Error calling recvfrom = %s\n", 
@@ -1042,9 +1090,9 @@ void pixirad::udpDataListenerTask()
                     received_packets++;
                     packet_tag = *buf;
                     if (packet_tag & AUTOCAL_DATA)
-                        temp_NPACK = AUTOCAL_NUM_PACKETS;
+                        temp_NPACK = numAutocalUDPPackets_;
                     else
-                        temp_NPACK = DEFAULT_UDP_NUM_PACKETS;
+                        temp_NPACK = numUDPPackets_;
 
                     packet_id = buf[MAX_UDP_PACKET_LEN*(i)+PACKET_ID_OFFSET]<<8;
                     packet_id += buf[MAX_UDP_PACKET_LEN*(i)+1+PACKET_ID_OFFSET];
@@ -1078,7 +1126,7 @@ void pixirad::udpDataListenerTask()
 
         i=0;
         local_packet_id=0;
-        process_buf = (unsigned char *) calloc((MAX_UDP_PACKET_LEN - PACKET_EXTRA_BYTES + PACKET_TAG_BYTES) * DEFAULT_UDP_NUM_PACKETS, 
+        process_buf = (unsigned char *) calloc((MAX_UDP_PACKET_LEN - PACKET_EXTRA_BYTES + PACKET_TAG_BYTES) * numUDPPackets_, 
                                               sizeof(unsigned short));
         if (process_buf == NULL) {
             asynPrint(pasynUserSelf, ASYN_TRACE_ERROR,
@@ -1156,7 +1204,6 @@ void pixirad::statusTask()
           driverName, functionName, strerror(SOCKERRNO));
       return;
   }
-
   serverAddr.sin_family = AF_INET;
   serverAddr.sin_addr.s_addr = INADDR_ANY;
   serverAddr.sin_port = htons(statusPortNumber_);
