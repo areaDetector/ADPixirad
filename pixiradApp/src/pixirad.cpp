@@ -89,6 +89,10 @@
 #define INITIAL_COOLING_VALUE       15
 #define INITIAL_COOLING_STATE       CoolingOn
 
+/* Pixie-III threshold calibration constants */
+#define PIII_P0                     494.70
+#define PIII_P1                     19.36
+
 /** Trigger modes */
 typedef enum {
     TMInternal,
@@ -153,6 +157,14 @@ typedef enum {
 } PixiradFrameType_t;
 static const char *PixiradFrameTypeStrings[] = {"1COL0", "1COL1", "2COL", "4COL", "DTF", "2COLDTF"};
 
+/*** Readout mode */
+typedef enum {
+    RM_Normal,
+    RM_NPI,
+    RM_NPI_SUM
+} PixiradCountModeType_t;
+static const char *PixiradCountModeStrings[] = {"Normal", "NPI", "NPISUM"};
+
 static const char *driverName = "pixirad";
 
 static double thresholdFractions[] = {
@@ -176,6 +188,7 @@ static double thresholdFractions[] = {
 #define PixiradThreshActual2String   "THRESHOLD_ACTUAL2"
 #define PixiradThreshActual3String   "THRESHOLD_ACTUAL3"
 #define PixiradThreshActual4String   "THRESHOLD_ACTUAL4"
+#define PixiradCountModeString       "COUNT_MODE"
 #define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 #define PixiradHVValueString         "HV_VALUE"
 #define PixiradHVStateString         "HV_STATE"
@@ -228,6 +241,7 @@ protected:
     int PixiradThreshActual2;
     int PixiradThreshActual3;
     int PixiradThreshActual4;
+    int PixiradCountMode;
     int PixiradAutoCalibrate;
     int PixiradHVValue;
     int PixiradHVState;
@@ -256,6 +270,7 @@ private:
     asynStatus setSync();
     asynStatus startAcquire();
     asynStatus stopAcquire();
+    void calculateThresholds(double *requestedEnergy_ptr, int *VThMax_ptr, int *thresholdRegisters_ptr, double *actualEnergy_ptr);
    
     /* Our data */
     epicsMessageQueueId dataMessageQueueId_;
@@ -268,6 +283,7 @@ private:
     asynUser *pasynUserCommandCommon_;
     int numUDPPackets_;
     int numAutocalUDPPackets_;
+    bool isPixieIII_;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
@@ -358,7 +374,7 @@ static int set_closest_Eth_DAC(double *allowedEth_ptr, double Eth, int *DAC, dou
     return i;
 }
 
-static void calculateThresholds(double *requestedEnergy_ptr, int *VThMax_ptr, int *thresholdRegisters_ptr, double *actualEnergy_ptr)
+void pixirad::calculateThresholds(double *requestedEnergy_ptr, int *VThMax_ptr, int *thresholdRegisters_ptr, double *actualEnergy_ptr)
 {
     double DeltaVth;
     double EthAllowedTable[INT_DAC_STEPS];
@@ -367,6 +383,16 @@ static void calculateThresholds(double *requestedEnergy_ptr, int *VThMax_ptr, in
     int VThMax;
     double Vth,Vth1;
 
+    if (isPixieIII_) {
+        for (i=0; i<NUM_THRESHOLDS; i++) {
+            thresholdRegisters_ptr[i] = (int)(PIII_P1 * requestedEnergy_ptr[i] + PIII_P0 + 0.5);
+            actualEnergy_ptr[i] = (thresholdRegisters_ptr[i] - PIII_P0) / PIII_P1;
+        }
+        return;
+    }
+
+    /* Pixie-II chip */
+    
     /********************************getting Vth1*****************************************/
     Vth1=get_vth_from_fit(requestedEnergy_ptr[0]);
 
@@ -384,7 +410,7 @@ static void calculateThresholds(double *requestedEnergy_ptr, int *VThMax_ptr, in
     }
     while (DeltaVth>VTH1_ACCURACY && VThMax>=VTHMAX_LOWER_LIMIT);
 
-    /**********************************Set VTHMAX, DACs and Energy Threshold for fisrt color*************************************/
+    /**********************************Set VTHMAX, DACs and Energy Threshold for first color*************************************/
     thresholdRegisters_ptr[0]=i-1; // DAC count is the fractions table index
     actualEnergy_ptr[0]=get_energy_from_fit(Vth);
     *VThMax_ptr=VThMax;
@@ -474,6 +500,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     createParam(PixiradThreshActual2String,   asynParamFloat64, &PixiradThreshActual2);
     createParam(PixiradThreshActual3String,   asynParamFloat64, &PixiradThreshActual3);
     createParam(PixiradThreshActual4String,   asynParamFloat64, &PixiradThreshActual4);
+    createParam(PixiradCountModeString,       asynParamInt32,   &PixiradCountMode);
     createParam(PixiradAutoCalibrateString,   asynParamInt32,   &PixiradAutoCalibrate);
     createParam(PixiradHVValueString,         asynParamFloat64, &PixiradHVValue);
     createParam(PixiradHVStateString,         asynParamInt32,   &PixiradHVState);
@@ -538,6 +565,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     // Set the NumUDPPackets and NumAutocalUDPPackets based on detector size
     switch (maxSizeX) {
         case 476:
+            isPixieIII_ = false;
             switch (maxSizeY) {
                 case 512:
                     numUDPPackets_ = 360;
@@ -545,11 +573,11 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
                     break;
                 case 1024:
                     numUDPPackets_ = 720;
-                    numAutocalUDPPackets_ = 135;
+                    numAutocalUDPPackets_ = 270;
                     break;
                 case 4096:
                     numUDPPackets_ = 2539;
-                    numAutocalUDPPackets_ = 135;
+                    numAutocalUDPPackets_ = 1080;
                     break;
                 default:
                     printf("%s::%s Illegal maxSizeY=%d\n", 
@@ -557,6 +585,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
                     break;
             }
         case 402:
+            isPixieIII_ = true;
             switch (maxSizeY) {
                 case 512:
                     numUDPPackets_ = 270;
@@ -568,7 +597,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
                     break;
                 case 4096:
                     numUDPPackets_ = 2539;
-                    numAutocalUDPPackets_ = 135;
+                    numAutocalUDPPackets_ = 1080;
                     break;
                 default:
                     printf("%s::%s Illegal maxSizeY=%d\n", 
@@ -691,17 +720,23 @@ asynStatus pixirad::setThresholds(int ref)
     int vthMax, auFS=7;
     int frameType;
     asynStatus status;
-    const char *dtf, *nbi;
+    int countMode;
+    int vbgMcalDAC = 0;
+    const char *readoutModeString, *countModeString;
     
     getIntegerParam(ADFrameType, &frameType);
-    
     if ((frameType == FTOneColorDTF) ||
         (frameType == FTTwoColorsDTF))
-        dtf = "DTF";
+        readoutModeString = "DTF";
     else
-        dtf = "NODTF";
+        readoutModeString = "NODTF";
 
-    nbi = "NONBI"; 
+    getIntegerParam(PixiradCountMode, &countMode);
+    if (isPixieIII_) {
+        countModeString = PixiradCountModeStrings[countMode];
+    } else {
+        countModeString = "NONBI"; 
+    }
 
     getDoubleParam(PixiradThresh1, &thresholdEnergy[0]);
     getDoubleParam(PixiradThresh2, &thresholdEnergy[1]);
@@ -716,10 +751,17 @@ asynStatus pixirad::setThresholds(int ref)
     setDoubleParam(PixiradThreshActual3, actualThresholdEnergy[2]);
     setDoubleParam(PixiradThreshActual4, actualThresholdEnergy[3]);
     
-    epicsSnprintf(toServer_, sizeof(toServer_), 
-                  "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
-                  thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
-                  vthMax, ref, auFS, dtf, nbi);
+    if (isPixieIII_) {
+        epicsSnprintf(toServer_, sizeof(toServer_), 
+                      "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %s %s %d", 
+                      thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
+                      readoutModeString, countModeString, vbgMcalDAC);
+    } else {
+        epicsSnprintf(toServer_, sizeof(toServer_), 
+                      "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
+                      thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
+                      vthMax, ref, auFS, readoutModeString, countModeString);
+    }
     status = writeReadServer();
     return status;
 }
