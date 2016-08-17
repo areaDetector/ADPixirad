@@ -6,7 +6,8 @@ include $(TOP)/configure/CONFIG
 LIBRARY_IOC += pixirad
 
 LIB_SRCS += pixirad.cpp
-LIB_SRCS += PIXIEII_data_utilities.cpp
+#LIB_SRCS += PIXIEII_data_utilities.cpp
+LIB_SRCS += PIXIE_data_utilities.cpp
 
 # Need to link DLL with WinSock library
 LIB_SYS_LIBS_WIN32 += ws2_32
