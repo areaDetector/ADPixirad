@@ -9,7 +9,7 @@
 #define PIXIEII_DATA_UTILITIES_V2_H_
 
 
-#define WINDOWS
+//#define WINDOWS
 
 
 /*********************************************************************************************************/
@@ -21,7 +21,7 @@
 
 
 #include "pxrd2_interface_misc.h"
-#include "build_ver.h"
+//#include "build_ver.h"
 
 //12 bit data fpga writing function Msb first
 //PA0 SCLK
@@ -111,6 +111,11 @@
 #define PIII_AUTOCAL_REGS				3
 #define PIII_COUNTER_REGS				2
 #define PIII_SEPARATION_COLUMNS_INPXX	4
+
+/* Need to define these constants */
+#define MAX_CODE_DEPTH 15
+#define MAX_DOUTS 16
+
 /*****************************************************************************/
 #define OLDRAW_HEADER_LENGHT			10
 #define FILE_HEADER_LENGHT				12
@@ -182,17 +187,4 @@ void get_pixie_raw_data(unsigned short*source_buff_ptr,unsigned short*dest_buff_
 int GeneratePIIIConversionTable(unsigned short *table_ptr,int table_size, int code_dept);
 int InvertPIIIConversionTable(unsigned short *table_ptr,int table_size, int code_dept);
 unsigned short * PIIIConversion_table_allocation(int code_depth);
-void accumulate_frame16(FrameAccumulator16 *regacc_ptr,unsigned short*temp_us_ptr,Connection Conn_ptr);
-void accumulate_frame32(FrameAccumulator32 *regacc_ptr,unsigned short*temp_us_ptr,Connection Conn_ptr);
-int accumulators16_allocator(FrameAccumulator16 *reg0acc16,FrameAccumulator16 *reg1acc16,Connection Conn);
-int accumulators32_allocator(FrameAccumulator32 *reg0acc32,FrameAccumulator32 *reg1acc32,Connection Conn);
-int normaps_allocator(FFMap* FFMap_ptr,Connection Conn);
-int normaps_fetcher(FFMap* FFMap_ptr,Connection* Conn_ptr,char* filename);
-int calmap_fetcher(FFMap* FFMAP_ptr, Connection *Conn);
-int flat(unsigned short *temp_us_ptr,FFMap FlatMap,ACQ_PROP AcqSett,Connection* Conn_ptr);
-int calculate_and_save_flatfield(FrameAccumulator32 reg0acc,FrameAccumulator32 reg1acc,Connection Conn,char* filename);
-int apply_pixel_calibration(FFMap CalMap,unsigned short *temp_us_ptr,Connection Conn);
-int apply_pixel_median_filtering(Connection Conn);
-int crop_Image(unsigned short *temp_us_ptr,Connection *Conn);
-int remap_cropped_Image(unsigned short* temp_us_ptr, Connection *Conn_ptr);
 #endif /* PIXIEII_DATA_UTILITIES_V2_H_ */
