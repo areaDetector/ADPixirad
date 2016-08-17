@@ -13,7 +13,7 @@
 #define PIXIEII_DATA_UTILITIES_V2_CPP_
 #include"PIXIEII_data_utilities_v2.h"
 
-extern int verbose;
+int verbose;
 
 // this routine has been developed by SAndro, abd generates the lookup table
 // for pixie counter conversion
@@ -24,7 +24,7 @@ void genera_tabella_clock(unsigned short *clocks, unsigned short dim, unsigned s
 
 
 		potenze[0]=1;
-		for (i=1; i<counterwidth+1; i++)
+		for (i=1; i<(unsigned long)(counterwidth+1); i++)
 			potenze[i]=potenze[i-1]*2;
 
 		clocks[0]=0;
@@ -47,7 +47,6 @@ void genera_tabella_clock(unsigned short *clocks, unsigned short dim, unsigned s
 
 unsigned short * conversion_table_allocation(SENSOR* Sens_ptr){
 	unsigned short *ush_ptr;
-	int i;
 	if((*Sens_ptr).Asic==PII){
 		(*Sens_ptr).conv_table.depth=PSTABLE_DEPTH;
 		ush_ptr=(unsigned short*)calloc(PSTABLE_DEPTH, sizeof(unsigned short));
@@ -233,17 +232,17 @@ void my_bytes_swap(unsigned short* us_ptr){
 int convert_bit_stream_to_counts(int code_depth,unsigned short* source_memory_offset,
 								unsigned short* destination_memory_offset,SENSOR Sens,int verbose){
 	int i,j;
-	unsigned short dout_masks[Sens.dout],counter_masks[code_depth]
+	unsigned short dout_masks[MAX_DOUTS],counter_masks[MAX_CODE_DEPTH]
 	               ,dout_mask_seed,cnt_mask_seed;
 	if(Sens.Asic==PIII){
 		dout_mask_seed=0x0001;
-		cnt_mask_seed=(0x0001 << code_depth-1);//Be aware counter are 15 bits wide
+		cnt_mask_seed=(0x0001 << (code_depth-1));//Be aware counter are 15 bits wide
 		for(i=0;i<Sens.dout;i++) dout_masks[i]=(dout_mask_seed<<i);
 		for(i=0;i<code_depth;i++) counter_masks[i]=(cnt_mask_seed>>i);
 		}
 	if(Sens.Asic==PII){
 		dout_mask_seed=0x0001;
-		cnt_mask_seed=(0x0001 << code_depth-1);
+		cnt_mask_seed=(0x0001 << (code_depth-1));
 		for(i=0;i<Sens.dout;i++) dout_masks[i]=(dout_mask_seed<<i);
 		for(i=0;i<code_depth;i++) counter_masks[i]=(cnt_mask_seed>>i);
 		}
@@ -262,7 +261,6 @@ int convert_bit_stream_to_counts(int code_depth,unsigned short* source_memory_of
 	}
 	if(verbose>=VERBOSITY_ULTRAHIGH){
 		for(i=0;i<code_depth;i++)printf("\nsource_mem[%d]-->%4X",i,source_memory_offset[i]);
-		Sleep(1000);
 		for(i=0;i<Sens.dout;i++) printf("\ndest[%d]-->%4X",i,destination_memory_offset[i]);
 	}
 return(j);
