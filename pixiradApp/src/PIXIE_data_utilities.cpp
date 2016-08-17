@@ -5,12 +5,15 @@
  *      Author: massimo
  */
 
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+
 #ifndef PIXIEII_DATA_UTILITIES_V2_CPP_
 #define PIXIEII_DATA_UTILITIES_V2_CPP_
 #include"PIXIEII_data_utilities_v2.h"
 
 extern int verbose;
-
 
 // this routine has been developed by SAndro, abd generates the lookup table
 // for pixie counter conversion
