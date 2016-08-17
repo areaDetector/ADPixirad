@@ -34,7 +34,7 @@
 #include <asynCommonSyncIO.h>
 
 #include "ADDriver.h"
-#include "PIXIEII_data_utilities.h"
+#include "PIXIEII_data_utilities_v2.h"
 #include <epicsExport.h>
 
 /** Messages to/from server */
@@ -283,7 +283,7 @@ private:
     asynUser *pasynUserCommandCommon_;
     int numUDPPackets_;
     int numAutocalUDPPackets_;
-    bool isPixieIII_;
+    SENSOR sensor_;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
@@ -307,34 +307,6 @@ static void udpDataListenerTaskC(void *drvPvt)
     pixirad *pPvt = (pixirad *)drvPvt;
     
     pPvt->udpDataListenerTask();
-}
-
-static int convert_bit_stream_to_counts(int code_depth, unsigned short* source_memory_offset,
-                                        unsigned short* destination_memory_offset, int reusulting_readings)
-{
-    int i,j;
-    unsigned short dout_masks[PIXIE_DOUTS], mask_seed=1;
-    for(i=0;i<reusulting_readings;i++) dout_masks[i]=(mask_seed<<i);
-    for(j=0;j<reusulting_readings;j++){
-        destination_memory_offset[j]=0;
-        for(i=code_depth-1;i>=0;i--){
-            if(source_memory_offset[i] & dout_masks[j])
-                destination_memory_offset[j]|= dout_masks[code_depth-i-1];
-            else
-                destination_memory_offset[j]&= ~dout_masks[code_depth-i-1];
-        }
-    }
-    return j;
-}
-
-static void my_bytes_swap(unsigned short* us_ptr)
-{
-    char a, b, *temp_char_ptr;
-    temp_char_ptr = (char*)us_ptr;
-    a = *temp_char_ptr;
-    b = *(temp_char_ptr+1);
-    *(temp_char_ptr+1) = a;
-    *(temp_char_ptr) = b;
 }
 
 static double get_vth_from_fit(double EnergyKev)
@@ -383,7 +355,7 @@ void pixirad::calculateThresholds(double *requestedEnergy_ptr, int *VThMax_ptr, 
     int VThMax;
     double Vth,Vth1;
 
-    if (isPixieIII_) {
+    if (sensor_.Asic == PIII) {
         for (i=0; i<NUM_THRESHOLDS; i++) {
             thresholdRegisters_ptr[i] = (int)(PIII_P1 * requestedEnergy_ptr[i] + PIII_P0 + 0.5);
             actualEnergy_ptr[i] = (thresholdRegisters_ptr[i] - PIII_P0) / PIII_P1;
@@ -554,8 +526,12 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status |= setIntegerParam(PixiradSyncOutFunction, SyncOutShutter);
     status |= setIntegerParam(PixiradSystemReset, 0);
     status |= setIntegerParam(PixiradCoolingStatus, 0);
-    
-    // There is a bug in the current firmware.  
+   
+    if (status) {
+        printf("%s:%s: unable to set camera parameters\n", driverName, functionName);
+        return;
+    }
+   // There is a bug in the current firmware.  
     // Two different HV values must be sent or it won't accept it.
     setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE-1.0);
     setCoolingAndHV();
@@ -565,17 +541,23 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     // Set the NumUDPPackets and NumAutocalUDPPackets based on detector size
     switch (maxSizeX) {
         case 476:
-            isPixieIII_ = false;
+            sensor_.Asic = PII;
             switch (maxSizeY) {
                 case 512:
+                    sensor_.Build = PX1;
+                    sensor_.modules = 1;
                     numUDPPackets_ = 360;
                     numAutocalUDPPackets_ = 135;
                     break;
                 case 1024:
+                    sensor_.Build = PX2;
+                    sensor_.modules = 2;
                     numUDPPackets_ = 720;
                     numAutocalUDPPackets_ = 270;
                     break;
                 case 4096:
+                    sensor_.Build = PX8;
+                    sensor_.modules = 8;
                     numUDPPackets_ = 2539;
                     numAutocalUDPPackets_ = 1080;
                     break;
@@ -585,17 +567,23 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
                     break;
             }
         case 402:
-            isPixieIII_ = true;
+            sensor_.Asic = PIII;
             switch (maxSizeY) {
                 case 512:
+                    sensor_.Build = PX1;
+                    sensor_.modules = 1;
                     numUDPPackets_ = 270;
                     numAutocalUDPPackets_ = 180;
                     break;
                 case 1024:
+                    sensor_.Build = PX2;
+                    sensor_.modules = 2;
                     numUDPPackets_ = 540;
                     numAutocalUDPPackets_ = 360;
                     break;
                 case 4096:
+                    sensor_.Build = PX8;
+                    sensor_.modules = 8;
                     numUDPPackets_ = 2539;
                     numAutocalUDPPackets_ = 1080;
                     break;
@@ -608,11 +596,35 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
             printf("%s::%s Illegal maxSizeX=%d\n", 
                     driverName, functionName, maxSizeX);
     }        
- 
-    if (status) {
-        printf("%s:%s: unable to set camera parameters\n", driverName, functionName);
-        return;
-    }
+	  if(sensor_.Asic == PII) {
+		  sensor_.matrix_size_pxls	= PII_MATRIX_DIM_WORDS;
+		  sensor_.cols				      = PII_PIXIE_COLS;
+		  sensor_.rows				      = PII_PIXIE_ROWS;
+		  sensor_.dout				      = PII_PIXIE_DOUTS;
+		  sensor_.cols_per_dout		  = PII_COLS_PER_DOUT;
+		  sensor_.bit_per_cnt_std	  = PII_STD_COUNTER_CODE_DEPTH;
+		  sensor_.bit_per_cnt_short	= PII_STD_COUNTER_CODE_DEPTH;
+		  sensor_.autocal_bit_cnt	  = PII_AUTOCAL_CODE_DEPTH;
+		  sensor_.autocal_regs		  = PII_AUTOCAL_REGS;
+		  sensor_.cnt_regs			    = PII_COUNTER_REGS;
+		  sensor_.separation_columns= PII_SEPARATION_COLUMNS_INPXX;
+		  sensor_.pixel_arr			    = EXAGON;
+		}
+	  else {
+		  sensor_.matrix_size_pxls	= PIII_MATRIX_DIM_WORDS;
+		  sensor_.cols				      = PIII_PIXIE_COLS;
+		  sensor_.rows				      = PIII_PIXIE_ROWS;
+		  sensor_.dout				      = PIII_PIXIE_DOUTS;
+		  sensor_.cols_per_dout		  = PIII_COLS_PER_DOUT;
+		  sensor_.bit_per_cnt_std	  = PIII_STD_COUNTER_CODE_DEPTH;
+		  sensor_.bit_per_cnt_short	= PIII_SHORT_COUNTER_CODE_DEPTH;
+		  sensor_.autocal_bit_cnt	  = PIII_AUTOCAL_CODE_DEPTH;
+		  sensor_.autocal_regs		  = PIII_AUTOCAL_REGS;
+		  sensor_.cnt_regs			    = PIII_COUNTER_REGS;
+		  sensor_.separation_columns= PIII_SEPARATION_COLUMNS_INPXX;
+		  sensor_.pixel_arr			    = SQUARE;
+		} 
+    conversion_table_allocation(&sensor_);
     
     /* Create the thread that receives status broadcasts for temperature, etc. */
     epicsThreadCreate("PixiradStatusTask",
@@ -732,7 +744,7 @@ asynStatus pixirad::setThresholds(int ref)
         readoutModeString = "NODTF";
 
     getIntegerParam(PixiradCountMode, &countMode);
-    if (isPixieIII_) {
+    if (sensor_.Asic == PIII) {
         countModeString = PixiradCountModeStrings[countMode];
     } else {
         countModeString = "NONBI"; 
@@ -751,7 +763,7 @@ asynStatus pixirad::setThresholds(int ref)
     setDoubleParam(PixiradThreshActual3, actualThresholdEnergy[2]);
     setDoubleParam(PixiradThreshActual4, actualThresholdEnergy[3]);
     
-    if (isPixieIII_) {
+    if (sensor_.Asic == PIII) {
         epicsSnprintf(toServer_, sizeof(toServer_), 
                       "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %s %s %d", 
                       thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
@@ -883,22 +895,21 @@ void pixirad::dataTask()
     int udpBuffersFree, udpBuffersMax;
     int arrayCallbacks;
     epicsTimeStamp startTime;
-    int is_autocal_data, i, j ,k, code_depth;
-    unsigned short *local_buffer_ptr, *temp_us_ptr, *conv, *process_buf_ptr;
+    unsigned short *local_buffer_ptr, *temp_us_ptr, *process_buf_ptr;
     unsigned short packet_tag;
     int status;
     int FTNumColors[] = {1, 1, 2, 4, 1, 2};
     int colorOffsetMap[] = {1, 0, 3, 2};
+    ACQ_PROP acqProp;
     static const char *functionName = "dataTask";
 
-    local_buffer_ptr = (unsigned short *) calloc(PIXIEII_MODULES*MATRIX_DIM_WORDS*15, sizeof(unsigned short));
+    local_buffer_ptr = (unsigned short *) calloc(sensor_.modules * sensor_.rows * sensor_.cols * 15, sizeof(unsigned short));
     if(local_buffer_ptr == NULL){
         asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
             "%s:%s: Error allocating local buffer\n",
             driverName, functionName);
         return;
     }
-    conv = conversion_table_allocation();
 
     lock();
     getIntegerParam(ADMaxSizeX, &sizeX);
@@ -925,11 +936,9 @@ void pixirad::dataTask()
         unlock();
         packet_tag = *(process_buf_ptr + PACKET_TAG_OFFSET*2);
         if (packet_tag & AUTOCAL_DATA) {
-            code_depth = 5;
-            is_autocal_data = 1;
+            acqProp.is_autocal = 1;
         } else {
-            code_depth = 15;
-            is_autocal_data = 0;
+            acqProp.is_autocal = 0;
         }
         if (packet_tag & FRAME_HAS_ALIGN_ERRORS) {
             asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
@@ -938,31 +947,7 @@ void pixirad::dataTask()
         }
 
         temp_us_ptr = process_buf_ptr + (PACKET_TAG_BYTES/2);
-        for (i=0; i<PIXIEII_MODULES; i++) {
-            for(j=0; j<COLS_PER_DOUT*PIXIE_ROWS; j++) {
-                for (k=0; k<code_depth; k++){
-                    my_bytes_swap(temp_us_ptr + i +( j*PIXIEII_MODULES*code_depth) + (k*PIXIEII_MODULES));
-                    local_buffer_ptr[(i*COLS_PER_DOUT*PIXIE_ROWS*code_depth) + (j*code_depth)+k] =
-                        temp_us_ptr[i + (j*PIXIEII_MODULES*code_depth) +( k*PIXIEII_MODULES)];
-                }
-            }
-        }
-
-        for(i=0; i<PIXIEII_MODULES; i++){
-            for(j=0; j<COLS_PER_DOUT*PIXIE_ROWS; j++) {
-                convert_bit_stream_to_counts(code_depth,
-                    local_buffer_ptr + (i*COLS_PER_DOUT*PIXIE_ROWS*code_depth) + (j*code_depth),
-                    process_buf_ptr + (i*MATRIX_DIM_WORDS) + (j*PIXIE_DOUTS) + (PACKET_TAG_BYTES/2), PIXIE_DOUTS);
-
-            }
-        }
-
-        for(i=0; i<PIXIEII_MODULES; i++){
-            if (is_autocal_data == 0)
-                decode_pixie_data_buffer(conv, process_buf_ptr + (PACKET_TAG_BYTES/2) + i*MATRIX_DIM_WORDS);
-            databuffer_sorting(process_buf_ptr + (PACKET_TAG_BYTES/2) + i*MATRIX_DIM_WORDS);
-            map_data_buffer_on_pixie(process_buf_ptr + (PACKET_TAG_BYTES/2) + i*MATRIX_DIM_WORDS);
-        }
+        get_pixie_raw_data(temp_us_ptr, local_buffer_ptr, acqProp, sensor_);
 
         lock();
         udpBuffersFree = udpBuffersMax - epicsMessageQueuePending(dataMessageQueueId_);
