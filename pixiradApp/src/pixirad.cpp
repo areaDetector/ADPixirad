@@ -164,6 +164,7 @@ typedef enum {
     RM_NPI_SUM
 } PixiradCountModeType_t;
 static const char *PixiradCountModeStrings[] = {"Normal", "NPI", "NPISUM"};
+static const char *PixiradModelNames[] = {"Pixirad-1", "Pixirad-2", "Pixirad-4", "Pixrad-8"};
 
 static const char *driverName = "pixirad";
 
@@ -175,6 +176,9 @@ static double thresholdFractions[] = {
 };
 
 #define PixiradSystemResetString     "SYSTEM_RESET"
+#define PixiradFirmwareVersionString "FIRMWARE_VERSION"
+#define PixiradSystemInfoString      "SYSTEM_INFO"
+#define PixiradSerialNumberString    "SERIAL_NUMBER"
 #define PixiradColorsCollectedString "COLORS_COLLECTED"
 #define PixiradUDPBuffersReadString  "UDP_BUFFERS_READ"
 #define PixiradUDPBuffersMaxString   "UDP_BUFFERS_MAX"
@@ -203,9 +207,8 @@ static double thresholdFractions[] = {
 #define PixiradBoxTemperatureString  "BOX_TEMPERATURE"
 #define PixiradBoxHumidityString     "BOX_HUMIDITY"
 #define PixiradDewPointString        "DEW_POINT"
-#define PixiradPeltierPowerString    "PELTIER_POWER"
 #define PixiradCoolingStatusString   "COOLING_STATUS"
-#define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
+#define PixiradPeltierPowerString    "PELTIER_POWER"
 
 /** Driver for PiXirad pixel array detectors using their server server over TCP/IP socket */
 class pixirad : public ADDriver {
@@ -228,6 +231,9 @@ public:
 protected:
     int PixiradSystemReset;
     #define FIRST_PIXIRAD_PARAM PixiradSystemReset
+    int PixiradFirmwareVersion;
+    int PixiradSystemInfo;
+    int PixiradSerialNumber;
     int PixiradColorsCollected;
     int PixiradUDPBuffersRead;
     int PixiradUDPBuffersMax;
@@ -434,6 +440,9 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
 
 {
     int status = asynSuccess;
+    int serialNumber;
+    char tempString[256];
+    char *tempPtr;
     const char *functionName = "pixirad";
 
     dataPortNumber_ = dataPortNumber;
@@ -459,6 +468,9 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status = pasynCommonSyncIO->connect(commandPortName, 0, &pasynUserCommandCommon_, NULL);
 
     createParam(PixiradSystemResetString,     asynParamInt32,   &PixiradSystemReset);
+    createParam(PixiradFirmwareVersionString, asynParamOctet,   &PixiradFirmwareVersion);
+    createParam(PixiradSystemInfoString,      asynParamOctet,   &PixiradSystemInfo);
+    createParam(PixiradSerialNumberString,    asynParamInt32,   &PixiradSerialNumber);
     createParam(PixiradColorsCollectedString, asynParamInt32,   &PixiradColorsCollected);
     createParam(PixiradUDPBuffersReadString,  asynParamInt32,   &PixiradUDPBuffersRead);
     createParam(PixiradUDPBuffersMaxString,   asynParamInt32,   &PixiradUDPBuffersMax);
@@ -492,7 +504,6 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
 
     /* Set some default values for parameters */
     status =  setStringParam (ADManufacturer, "Pixirad");
-    status |= setStringParam (ADModel, "Pixirad 1");
     status |= setIntegerParam(ADMaxSizeX, maxSizeX);
     status |= setIntegerParam(ADMaxSizeY, maxSizeY);
     status |= setIntegerParam(ADSizeX, maxSizeX);
@@ -538,6 +549,18 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE);
     setCoolingAndHV();
     
+    epicsSnprintf(toServer_, sizeof(toServer_), 
+                  "SYS:? GET_FIRMWARE_VERSION");
+    status = writeReadServer();
+    sscanf(fromServer_, "DETECTOR %d FRMW_VER: %s", &serialNumber, tempString);
+    setIntegerParam(PixiradSerialNumber, serialNumber);
+    setStringParam(PixiradFirmwareVersion, tempString);
+    epicsSnprintf(toServer_, sizeof(toServer_), 
+                  "SYS:? GET_ADDITIONAL_INFO");
+    status = writeReadServer();
+    tempPtr = strstr(fromServer_, "ADDITIONAL INFO: ") + strlen("ADDITIONAL INFO: ");
+    setStringParam(PixiradSystemInfo, tempPtr);
+
     // Set the NumUDPPackets and NumAutocalUDPPackets based on detector size
     switch (maxSizeX) {
         case 476:
@@ -625,6 +648,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
 		  sensor_.pixel_arr			    = SQUARE;
 		} 
     conversion_table_allocation(&sensor_);
+    setStringParam(ADModel, PixiradModelNames[sensor_.Build]); 
     
     /* Create the thread that receives status broadcasts for temperature, etc. */
     epicsThreadCreate("PixiradStatusTask",
@@ -788,7 +812,7 @@ asynStatus pixirad::doAutoCalibrate()
     // Need to set REF=0 before doing autocalibrate
     setThresholds(0);
     epicsSnprintf(toServer_, sizeof(toServer_), 
-                  "DAQ:! AUTOCAL");
+                  "DAQ:! AUTOCAL_LAST");
     status = writeReadServer();
     // Set REF=1 after autocalibrate
     setThresholds(1);
@@ -859,8 +883,8 @@ asynStatus pixirad::writeReadServer()
                     driverName, functionName, timeout, status, 
                     (unsigned long)nwrite, (unsigned long)nread, fromServer_);
     else {
-        /* Look for the string "GOT:" in the response */
-        if (!strstr(fromServer_, "GOT:")) {
+        /* Look for the string "GOT:" in the response if the command was not a SYS:? command */
+        if (!strstr(toServer_, "SYS:?") && !strstr(fromServer_, "GOT:")) {
             asynPrint(pasynUser, ASYN_TRACE_ERROR,
                       "%s:%s unexpected response from server = %s\n",
                       driverName, functionName, fromServer_);
@@ -927,6 +951,9 @@ void pixirad::dataTask()
                 driverName, functionName, status);
              continue;
         }
+        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
+            "%s:%s: received image via epicsMessageQueue\n",
+            driverName, functionName);
         if (process_buf_ptr == NULL) {
             asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
                 "%s:%s: Error process_buf_ptr=NULL\n",
@@ -940,6 +967,9 @@ void pixirad::dataTask()
         } else {
             acqProp.is_autocal = 0;
         }
+        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
+            "%s:%s: acqProp.is_autocal=%d\n",
+            driverName, functionName, acqProp.is_autocal);
         if (packet_tag & FRAME_HAS_ALIGN_ERRORS) {
             asynPrint(pasynUserSelf, ASYN_TRACE_ERROR, 
                 "%s:%s: frame has alignment errors\n",
@@ -948,6 +978,9 @@ void pixirad::dataTask()
 
         temp_us_ptr = process_buf_ptr + (PACKET_TAG_BYTES/2);
         get_pixie_raw_data(temp_us_ptr, local_buffer_ptr, acqProp, sensor_);
+        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
+            "%s:%s: called get_pixie_raw_data\n",
+            driverName, functionName);
 
         lock();
         udpBuffersFree = udpBuffersMax - epicsMessageQueuePending(dataMessageQueueId_);
@@ -956,7 +989,7 @@ void pixirad::dataTask()
         getIntegerParam(ADFrameType, &frameType);
         getIntegerParam(PixiradAutoCalibrate, &autoCalibrate);
         if (autoCalibrate) {
-            numColors = 2;
+            numColors = 1;
         } else {
             numColors = FTNumColors[frameType];
         }
@@ -984,6 +1017,9 @@ void pixirad::dataTask()
                process_buf_ptr+PACKET_TAG_BYTES/2, 
                sizeX * sizeY * sizeof(unsigned short));
 
+        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
+            "%s:%s: numColors=%d, colorsCollected=%d\n",
+            driverName, functionName, numColors, colorsCollected);
         // Free the process_buf_ptr, no longer needed
         free(process_buf_ptr);
 
@@ -1147,7 +1183,7 @@ void pixirad::udpDataListenerTask()
         epicsTimeGetCurrent(&timer_b);
         time_interval = epicsTimeDiffInSeconds(&timer_b, &timer_a);
         udpSpeed = (i * MAX_UDP_PACKET_LEN) / (time_interval*1024*1024);
-        asynPrint(pasynUserSelf, ASYN_TRACEIO_DRIVER,
+        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
             "%s:%s: received %d packets (%d bytes each)  in %.3f s, = %.3f MB/s\n",
             driverName, functionName, i, MAX_UDP_PACKET_LEN, time_interval, udpSpeed);
 
@@ -1177,6 +1213,9 @@ void pixirad::udpDataListenerTask()
         getIntegerParam(PixiradUDPBuffersRead, &udpBuffersRead);
         udpBuffersRead++;
         setIntegerParam(PixiradUDPBuffersRead, udpBuffersRead);
+        asynPrint(pasynUserSelf, ASYN_TRACE_FLOW,
+            "%s:%s: sending image via epicsMessageQueue\n",
+            driverName, functionName);
         epicsMessageQueueSend(dataMessageQueueId_, &process_buf, sizeof(&process_buf));
         udpBuffersFree = udpBuffersMax - epicsMessageQueuePending(dataMessageQueueId_);
         setIntegerParam(PixiradUDPBuffersFree, udpBuffersFree);
