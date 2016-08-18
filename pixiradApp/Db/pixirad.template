@@ -64,6 +64,34 @@ record(ao, "$(P)$(R)Temperature")       { field(PREC, "1") }
 #
 # These are the records that are new to the Pixirad driver
 #
+record(waveform, "$(P)$(R)FirmwareVersion")
+{
+    field(PINI, "YES")
+    field(DTYP, "asynOctetRead")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))FIRMWARE_VERSION")
+    field(DESC, "Firmware version")
+    field(FTVL, "CHAR")
+    field(NELM, "256")
+}
+
+record(waveform, "$(P)$(R)SystemInfo")
+{
+    field(PINI, "YES")
+    field(DTYP, "asynOctetRead")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SYSTEM_INFO")
+    field(DESC, "System information")
+    field(FTVL, "CHAR")
+    field(NELM, "256")
+}
+
+record(longin, "$(P)$(R)SerialNumber")
+{
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))SERIAL_NUMBER")
+    field(DESC, "Serial number")
+    field(SCAN, "I/O Intr")
+}
+
 # Threshold energies
 record(ao, "$(P)$(R)Threshold1")
 {
@@ -186,6 +214,32 @@ record(ai, "$(P)$(R)ThresholdActual4_RBV")
     field(DESC, "Actual energy threshold")
     field(EGU,  "keV")
     field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(mbbo,"$(P)$(R)CountMode") {
+    field(DESC, "Count mode")
+    field(PINI, "YES")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COUNT_MODE")
+    field(ZRVL, "0")
+    field(ZRST, "Normal")
+    field(ONVL, "1")
+    field(ONST, "NPI")
+    field(TWVL, "2")
+    field(TWST, "NPISUM")
+}
+
+record(mbbi,"$(P)$(R)CountMode_RBV") {
+    field(DESC, "Count mode")
+    field(DTYP, "asynInt32")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))COUNT_MODE")
+    field(ZRVL, "0")
+    field(ZRST, "Normal")
+    field(ONVL, "1")
+    field(ONST, "NPI")
+    field(TWVL, "2")
+    field(TWST, "NPISUM")
     field(SCAN, "I/O Intr")
 }
 
