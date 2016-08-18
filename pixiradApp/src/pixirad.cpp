@@ -1382,7 +1382,8 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
                (function == PixiradSyncOutFunction)) {
         status = setSync();
 
-    } else if (function == ADFrameType) {
+    } else if ((function == ADFrameType) ||
+               (function == PixiradCountMode)) {
         status = setThresholds(1);
         
     } else if ((function == PixiradHVState) ||
