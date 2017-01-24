@@ -37,6 +37,10 @@
 #include "PIXIEII_data_utilities_v2.h"
 #include <epicsExport.h>
 
+#define DRIVER_VERSION      2
+#define DRIVER_REVISION     2
+#define DRIVER_MODIFICATION 0
+
 /** Messages to/from server */
 #define MAX_MESSAGE_SIZE 256 
 #define SERVER_DEFAULT_TIMEOUT 1.0
@@ -176,9 +180,7 @@ static double thresholdFractions[] = {
 };
 
 #define PixiradSystemResetString     "SYSTEM_RESET"
-#define PixiradFirmwareVersionString "FIRMWARE_VERSION"
 #define PixiradSystemInfoString      "SYSTEM_INFO"
-#define PixiradSerialNumberString    "SERIAL_NUMBER"
 #define PixiradColorsCollectedString "COLORS_COLLECTED"
 #define PixiradUDPBuffersReadString  "UDP_BUFFERS_READ"
 #define PixiradUDPBuffersMaxString   "UDP_BUFFERS_MAX"
@@ -231,9 +233,7 @@ public:
 protected:
     int PixiradSystemReset;
     #define FIRST_PIXIRAD_PARAM PixiradSystemReset
-    int PixiradFirmwareVersion;
     int PixiradSystemInfo;
-    int PixiradSerialNumber;
     int PixiradColorsCollected;
     int PixiradUDPBuffersRead;
     int PixiradUDPBuffersMax;
@@ -440,7 +440,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
 
 {
     int status = asynSuccess;
-    int serialNumber;
+    char serialNumber[256];
     char tempString[256];
     char *tempPtr;
     const char *functionName = "pixirad";
@@ -468,9 +468,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     status = pasynCommonSyncIO->connect(commandPortName, 0, &pasynUserCommandCommon_, NULL);
 
     createParam(PixiradSystemResetString,     asynParamInt32,   &PixiradSystemReset);
-    createParam(PixiradFirmwareVersionString, asynParamOctet,   &PixiradFirmwareVersion);
     createParam(PixiradSystemInfoString,      asynParamOctet,   &PixiradSystemInfo);
-    createParam(PixiradSerialNumberString,    asynParamInt32,   &PixiradSerialNumber);
     createParam(PixiradColorsCollectedString, asynParamInt32,   &PixiradColorsCollected);
     createParam(PixiradUDPBuffersReadString,  asynParamInt32,   &PixiradUDPBuffersRead);
     createParam(PixiradUDPBuffersMaxString,   asynParamInt32,   &PixiradUDPBuffersMax);
@@ -549,12 +547,16 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     setDoubleParam(PixiradHVValue, INITIAL_HV_VALUE);
     setCoolingAndHV();
     
+    epicsSnprintf(tempString, sizeof(tempString), "%d.%d.%d", 
+                  DRIVER_VERSION, DRIVER_REVISION, DRIVER_MODIFICATION);
+    setStringParam(NDDriverVersion, tempString);
+
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "SYS:? GET_FIRMWARE_VERSION");
     status = writeReadServer();
-    sscanf(fromServer_, "DETECTOR %d FRMW_VER: %s", &serialNumber, tempString);
-    setIntegerParam(PixiradSerialNumber, serialNumber);
-    setStringParam(PixiradFirmwareVersion, tempString);
+    sscanf(fromServer_, "DETECTOR %s FRMW_VER: %s", serialNumber, tempString);
+    setStringParam(ADSerialNumber, serialNumber);
+    setStringParam(ADFirmwareVersion, tempString);
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "SYS:? GET_ADDITIONAL_INFO");
     status = writeReadServer();
@@ -589,6 +591,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
                         driverName, functionName, maxSizeY);
                     break;
             }
+            break;
         case 402:
             sensor_.Asic = PIII;
             switch (maxSizeY) {
@@ -615,6 +618,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
                         driverName, functionName, maxSizeY);
                     break;
             }
+            break;
         default:
             printf("%s::%s Illegal maxSizeX=%d\n", 
                     driverName, functionName, maxSizeX);
