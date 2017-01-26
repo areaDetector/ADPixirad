@@ -965,6 +965,7 @@ void pixirad::dataTask()
             continue;
         }
         unlock();
+        acqProp.decode = 1;
         packet_tag = *(process_buf_ptr + PACKET_TAG_OFFSET*2);
         if (packet_tag & AUTOCAL_DATA) {
             acqProp.is_autocal = 1;
