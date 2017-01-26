@@ -13,7 +13,8 @@
 #define PIXIEII_DATA_UTILITIES_V2_CPP_
 #include"PIXIEII_data_utilities_v2.h"
 
-int verbose;
+int verbose=NOVERBOSE;
+//int verbose=VERBOSITY_ULTRAHIGH;
 
 // this routine has been developed by SAndro, abd generates the lookup table
 // for pixie counter conversion
