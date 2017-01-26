@@ -623,34 +623,34 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
             printf("%s::%s Illegal maxSizeX=%d\n", 
                     driverName, functionName, maxSizeX);
     }        
-	  if(sensor_.Asic == PII) {
-		  sensor_.matrix_size_pxls	= PII_MATRIX_DIM_WORDS;
-		  sensor_.cols				      = PII_PIXIE_COLS;
-		  sensor_.rows				      = PII_PIXIE_ROWS;
-		  sensor_.dout				      = PII_PIXIE_DOUTS;
-		  sensor_.cols_per_dout		  = PII_COLS_PER_DOUT;
-		  sensor_.bit_per_cnt_std	  = PII_STD_COUNTER_CODE_DEPTH;
-		  sensor_.bit_per_cnt_short	= PII_STD_COUNTER_CODE_DEPTH;
-		  sensor_.autocal_bit_cnt	  = PII_AUTOCAL_CODE_DEPTH;
-		  sensor_.autocal_regs		  = PII_AUTOCAL_REGS;
-		  sensor_.cnt_regs			    = PII_COUNTER_REGS;
-		  sensor_.separation_columns= PII_SEPARATION_COLUMNS_INPXX;
-		  sensor_.pixel_arr			    = EXAGON;
-		}
-	  else {
-		  sensor_.matrix_size_pxls	= PIII_MATRIX_DIM_WORDS;
-		  sensor_.cols				      = PIII_PIXIE_COLS;
-		  sensor_.rows				      = PIII_PIXIE_ROWS;
-		  sensor_.dout				      = PIII_PIXIE_DOUTS;
-		  sensor_.cols_per_dout		  = PIII_COLS_PER_DOUT;
-		  sensor_.bit_per_cnt_std	  = PIII_STD_COUNTER_CODE_DEPTH;
-		  sensor_.bit_per_cnt_short	= PIII_SHORT_COUNTER_CODE_DEPTH;
-		  sensor_.autocal_bit_cnt	  = PIII_AUTOCAL_CODE_DEPTH;
-		  sensor_.autocal_regs		  = PIII_AUTOCAL_REGS;
-		  sensor_.cnt_regs			    = PIII_COUNTER_REGS;
-		  sensor_.separation_columns= PIII_SEPARATION_COLUMNS_INPXX;
-		  sensor_.pixel_arr			    = SQUARE;
-		} 
+      if(sensor_.Asic == PII) {
+          sensor_.matrix_size_pxls   = PII_MATRIX_DIM_WORDS;
+          sensor_.cols               = PII_PIXIE_COLS;
+          sensor_.rows               = PII_PIXIE_ROWS;
+          sensor_.dout               = PII_PIXIE_DOUTS;
+          sensor_.cols_per_dout      = PII_COLS_PER_DOUT;
+          sensor_.bit_per_cnt_std    = PII_STD_COUNTER_CODE_DEPTH;
+          sensor_.bit_per_cnt_short  = PII_STD_COUNTER_CODE_DEPTH;
+          sensor_.autocal_bit_cnt    = PII_AUTOCAL_CODE_DEPTH;
+          sensor_.autocal_regs       = PII_AUTOCAL_REGS;
+          sensor_.cnt_regs           = PII_COUNTER_REGS;
+          sensor_.separation_columns = PII_SEPARATION_COLUMNS_INPXX;
+          sensor_.pixel_arr          = EXAGON;
+        }
+      else {
+          sensor_.matrix_size_pxls   = PIII_MATRIX_DIM_WORDS;
+          sensor_.cols               = PIII_PIXIE_COLS;
+          sensor_.rows               = PIII_PIXIE_ROWS;
+          sensor_.dout               = PIII_PIXIE_DOUTS;
+          sensor_.cols_per_dout      = PIII_COLS_PER_DOUT;
+          sensor_.bit_per_cnt_std    = PIII_STD_COUNTER_CODE_DEPTH;
+          sensor_.bit_per_cnt_short  = PIII_SHORT_COUNTER_CODE_DEPTH;
+          sensor_.autocal_bit_cnt    = PIII_AUTOCAL_CODE_DEPTH;
+          sensor_.autocal_regs       = PIII_AUTOCAL_REGS;
+          sensor_.cnt_regs           = PIII_COUNTER_REGS;
+          sensor_.separation_columns = PIII_SEPARATION_COLUMNS_INPXX;
+          sensor_.pixel_arr          = SQUARE;
+        } 
     conversion_table_allocation(&sensor_);
     setStringParam(ADModel, PixiradModelNames[sensor_.Build]); 
     
