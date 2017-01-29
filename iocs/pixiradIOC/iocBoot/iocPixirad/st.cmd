@@ -41,6 +41,9 @@ asynSetTraceIOMask($(COMMAND_PORT), 0, 2)
 #asynSetTraceMask($(COMMAND_PORT), 0, 9)
 
 pixiradConfig("$(PORT)", "$(COMMAND_PORT)", "$(DATA_PORT)", "$(STATUS_PORT)", $(DATA_PORT_BUFFERS), $(XSIZE), $(YSIZE))
+# The following command is needed for PIII detectors.  
+# The values are detector specific and can currently only be found in the Python code that ships with the detector
+pixiradAutoCal("$(PORT)", 0, 0, 7, 7, 3, 7, 1850)
 asynSetTraceIOMask($(PORT), 0, 2)
 #asynSetTraceMask($(PORT), 0, 255)
 
