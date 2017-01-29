@@ -229,6 +229,7 @@ public:
     void statusTask();
     void dataTask();
     void udpDataListenerTask();
+    asynStatus setAutoCalParams(int ofs0, int fs0, int ofs2, int fs1, int fs2, int ibias, int vbgMcalDAC);
     
 protected:
     int PixiradSystemReset;
@@ -290,6 +291,7 @@ private:
     int numUDPPackets_;
     int numAutocalUDPPackets_;
     SENSOR sensor_;
+    int vbgMcalDAC_;
 };
 
 #define NUM_PIXIRAD_PARAMS ((int)(&LAST_PIXIRAD_PARAM - &FIRST_PIXIRAD_PARAM + 1))
@@ -752,6 +754,19 @@ asynStatus pixirad::setSync()
     return status;
 }
     
+asynStatus pixirad::setAutoCalParams(int ofs0, int fs0, int ofs2, int fs1, int fs2, int ibias, int vbgMcalDAC)
+{
+    asynStatus status;
+
+    vbgMcalDAC_ = vbgMcalDAC;
+    epicsSnprintf(toServer_, sizeof(toServer_), 
+                  "DAQ:! SET_PIII_CONF %d %d %d %d %d %d", 
+                  ofs0, fs0, ofs2, fs1, fs2, ibias);
+    status = writeReadServer();
+    return status;
+
+}
+
 asynStatus pixirad::setThresholds(int ref)
 {
     double thresholdEnergy[4];
@@ -761,7 +776,6 @@ asynStatus pixirad::setThresholds(int ref)
     int frameType;
     asynStatus status;
     int countMode;
-    int vbgMcalDAC = 0;
     const char *readoutModeString, *countModeString;
     
     getIntegerParam(ADFrameType, &frameType);
@@ -795,7 +809,7 @@ asynStatus pixirad::setThresholds(int ref)
         epicsSnprintf(toServer_, sizeof(toServer_), 
                       "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %s %s %d", 
                       thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
-                      readoutModeString, countModeString, vbgMcalDAC);
+                      readoutModeString, countModeString, vbgMcalDAC_);
     } else {
         epicsSnprintf(toServer_, sizeof(toServer_), 
                       "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %d %d %s %s", 
@@ -1501,6 +1515,15 @@ extern "C" int pixiradConfig(const char *portName, const char *commandPort,
     return(asynSuccess);
 }
 
+extern "C" int pixiradAutoCal(const char *portName, int ofs0, int fs0, int ofs2, int fs1, int fs2, int ibias, int vbgMcalDAC)
+{
+    pixirad *pr = (pixirad *)findAsynPortDriver(portName);
+    if (pr != 0) {
+        pr->setAutoCalParams(ofs0, fs0, ofs2, fs1, fs2, ibias, vbgMcalDAC);
+    }
+    return 0;
+}
+
 /* Code for iocsh registration */
 static const iocshArg pixiradConfigArg0 = {"Port name", iocshArgString};
 static const iocshArg pixiradConfigArg1 = {"command port name", iocshArgString};
@@ -1524,18 +1547,43 @@ static const iocshArg * const pixiradConfigArgs[] =  {&pixiradConfigArg0,
                                                       &pixiradConfigArg8,
                                                       &pixiradConfigArg9,
                                                       &pixiradConfigArg10};
-static const iocshFuncDef configpixirad = {"pixiradConfig", 11, pixiradConfigArgs};
-static void configpixiradCallFunc(const iocshArgBuf *args)
+static const iocshFuncDef configPixirad = {"pixiradConfig", 11, pixiradConfigArgs};
+static void configPixiradCallFunc(const iocshArgBuf *args)
 {
     pixiradConfig(args[0].sval, args[1].sval, args[2].ival,  args[3].ival,  
                   args[4].ival, args[5].ival, args[6].ival,  args[7].ival,
                   args[8].ival, args[9].ival, args[10].ival);
 }
 
+static const iocshArg pixiradAutoCalArg0 = {"Port name", iocshArgString};
+static const iocshArg pixiradAutoCalArg1 = {"ofs0",  iocshArgInt};
+static const iocshArg pixiradAutoCalArg2 = {"fs0",   iocshArgInt};
+static const iocshArg pixiradAutoCalArg3 = {"ofs2",  iocshArgInt};
+static const iocshArg pixiradAutoCalArg4 = {"fs1",   iocshArgInt};
+static const iocshArg pixiradAutoCalArg5 = {"fs2",   iocshArgInt};
+static const iocshArg pixiradAutoCalArg6 = {"Ibias", iocshArgInt};
+static const iocshArg pixiradAutoCalArg7 = {"vbgMcalDAC", iocshArgInt};
+static const iocshArg * const pixiradAutoCalArgs[] =  {&pixiradAutoCalArg0,
+                                                       &pixiradAutoCalArg1,
+                                                       &pixiradAutoCalArg2,
+                                                       &pixiradAutoCalArg3,
+                                                       &pixiradAutoCalArg4,
+                                                       &pixiradAutoCalArg5,
+                                                       &pixiradAutoCalArg6,
+                                                       &pixiradAutoCalArg7};
+static const iocshFuncDef autoCalPixirad = {"pixiradAutoCal", 8, pixiradAutoCalArgs};
+static void autoCalPixiradCallFunc(const iocshArgBuf *args)
+{
+    pixiradAutoCal(args[0].sval, args[1].ival, args[2].ival, args[3].ival,  
+                   args[4].ival, args[5].ival, args[6].ival, args[7].ival);
+}
+
+
 
 static void pixiradRegister(void)
 {
-    iocshRegister(&configpixirad, configpixiradCallFunc);
+    iocshRegister(&configPixirad, configPixiradCallFunc);
+    iocshRegister(&autoCalPixirad, autoCalPixiradCallFunc);
 }
 
 extern "C" {
