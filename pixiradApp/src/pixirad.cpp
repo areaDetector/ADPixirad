@@ -562,7 +562,7 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     epicsSnprintf(toServer_, sizeof(toServer_), 
                   "SYS:? GET_ADDITIONAL_INFO");
     status = writeReadServer();
-    tempPtr = strstr(fromServer_, "ADDITIONAL INFO: ") + strlen("ADDITIONAL INFO: ");
+    tempPtr = strstr(fromServer_, "ADDITIONAL INFO:") + strlen("ADDITIONAL INFO:");
     setStringParam(PixiradSystemInfo, tempPtr);
 
     // Set the NumUDPPackets and NumAutocalUDPPackets based on detector size
