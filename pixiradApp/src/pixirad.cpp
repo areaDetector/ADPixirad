@@ -1389,7 +1389,7 @@ asynStatus pixirad::writeInt32(asynUser *pasynUser, epicsInt32 value)
         } 
         else if (!value && isAcquiring) {
             //  This seems to be screwing things up, comment out temporarily
-            //status = stopAcquire();
+            status = stopAcquire();
         }
 
     } else if ((function == PixiradSyncInPolarity)  ||
