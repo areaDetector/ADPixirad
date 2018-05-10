@@ -39,6 +39,8 @@ drvAsynIPPortConfigure("$(COMMAND_PORT)","192.168.0.1:2222 HTTP", 0, 0, 0)
 asynOctetSetOutputEos($(COMMAND_PORT), 0, "\n")
 asynSetTraceIOMask($(COMMAND_PORT), 0, 2)
 #asynSetTraceMask($(COMMAND_PORT), 0, 9)
+#asynSetTraceIOTruncateSize($(COMMAND_PORT), 0, 256)
+#asynSetTraceFile($(COMMAND_PORT), 0, "asynTrace.txt")
 
 pixiradConfig("$(PORT)", "$(COMMAND_PORT)", "$(DATA_PORT)", "$(STATUS_PORT)", $(DATA_PORT_BUFFERS), $(XSIZE), $(YSIZE))
 # The following command is needed for PIII detectors.  
@@ -57,9 +59,11 @@ dbLoadRecords("$(ADCORE)/db/NDStdArrays.template","P=$(PREFIX),R=image1:,PORT=Im
 < $(ADCORE)/iocBoot/commonPlugins.cmd
 set_requestfile_path("$(ADPIXIRAD)/pixiradApp/Db")
 
-
-
 iocInit()
 
 # save things every thirty seconds
 create_monitor_set("auto_settings.req", 30,"P=$(PREFIX)")
+
+# Force an autocalibration
+dbpf("$(PREFIX)cam1:AutoCalibrate", "1")
+
