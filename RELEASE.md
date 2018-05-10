@@ -18,13 +18,14 @@ files respectively, in the configure/ directory of the appropriate release of th
 
 Release Notes
 =============
-R2-2 (XXX-July-2017)
+R2-2 (XXX-May-2018)
 * Added support for the PIXI-III chip
   - NPI and NPISUM count modes.
   - NOTE: These count modes need to be tested before R2-2 is released
 * R2-2 needs to be tested on older PIXI-II chip models to make sure it still works
 * Documentation needs to be updated for new CountMode parameter
- 
+* Need to document that 1 Color Low is now the counts between Thresh1 and Thresh2
+
 R2-1 (16-April-2015)
 ----
 * Changes for compatibility with ADCore R2-2.
