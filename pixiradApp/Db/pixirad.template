@@ -177,6 +177,27 @@ record(ai, "$(P)$(R)Threshold4_RBV")
     field(SCAN, "I/O Intr")
 }
 
+record(ao, "$(P)$(R)HitThreshold")
+{
+    field(PINI, "YES")
+    field(DTYP, "asynFloat64")
+    field(OUT,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HIT_THRESHOLD")
+    field(DESC, "Energy threshold")
+    field(EGU,  "keV")
+    field(PREC, "1")
+    field(VAL, "5.000")
+}
+
+record(ai, "$(P)$(R)HitThreshold_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HIT_THRESHOLD")
+    field(DESC, "Energy threshold")
+    field(EGU,  "keV")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
 record(ai, "$(P)$(R)ThresholdActual1_RBV")
 {
     field(DTYP, "asynFloat64")
@@ -211,6 +232,16 @@ record(ai, "$(P)$(R)ThresholdActual4_RBV")
 {
     field(DTYP, "asynFloat64")
     field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))THRESHOLD_ACTUAL4")
+    field(DESC, "Actual energy threshold")
+    field(EGU,  "keV")
+    field(PREC, "1")
+    field(SCAN, "I/O Intr")
+}
+
+record(ai, "$(P)$(R)HitThresholdActual_RBV")
+{
+    field(DTYP, "asynFloat64")
+    field(INP,  "@asyn($(PORT),$(ADDR),$(TIMEOUT))HIT_THRESHOLD_ACTUAL")
     field(DESC, "Actual energy threshold")
     field(EGU,  "keV")
     field(PREC, "1")
