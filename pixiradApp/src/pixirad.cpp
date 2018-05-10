@@ -75,7 +75,7 @@
 #define PIXIE_THDAC_OFFSET          0
 #define DUMMY_1_OFFSET              8
 
-#define NUM_THRESHOLDS              4
+#define NUM_THRESHOLDS              5  // Includes Hit Threshold (VtHit) for PIII
 #define THRESH_B_COEFF              39.3
 #define THRESH_A_COEFF              36.6
 #define EXTDAC_LSB                  0.000781
@@ -190,10 +190,12 @@ static double thresholdFractions[] = {
 #define PixiradThresh2String         "THRESHOLD2"
 #define PixiradThresh3String         "THRESHOLD3"
 #define PixiradThresh4String         "THRESHOLD4"
+#define PixiradHitThreshString       "HIT_THRESHOLD"
 #define PixiradThreshActual1String   "THRESHOLD_ACTUAL1"
 #define PixiradThreshActual2String   "THRESHOLD_ACTUAL2"
 #define PixiradThreshActual3String   "THRESHOLD_ACTUAL3"
 #define PixiradThreshActual4String   "THRESHOLD_ACTUAL4"
+#define PixiradHitThreshActualString "HIT_THRESHOLD_ACTUAL"
 #define PixiradCountModeString       "COUNT_MODE"
 #define PixiradAutoCalibrateString   "AUTO_CALIBRATE"
 #define PixiradHVValueString         "HV_VALUE"
@@ -244,10 +246,12 @@ protected:
     int PixiradThresh2;
     int PixiradThresh3;
     int PixiradThresh4;
+    int PixiradHitThresh;
     int PixiradThreshActual1;
     int PixiradThreshActual2;
     int PixiradThreshActual3;
     int PixiradThreshActual4;
+    int PixiradHitThreshActual;
     int PixiradCountMode;
     int PixiradAutoCalibrate;
     int PixiradHVValue;
@@ -480,10 +484,12 @@ pixirad::pixirad(const char *portName, const char *commandPortName,
     createParam(PixiradThresh2String,         asynParamFloat64, &PixiradThresh2);
     createParam(PixiradThresh3String,         asynParamFloat64, &PixiradThresh3);
     createParam(PixiradThresh4String,         asynParamFloat64, &PixiradThresh4);
+    createParam(PixiradHitThreshString,       asynParamFloat64, &PixiradHitThresh);
     createParam(PixiradThreshActual1String,   asynParamFloat64, &PixiradThreshActual1);
     createParam(PixiradThreshActual2String,   asynParamFloat64, &PixiradThreshActual2);
     createParam(PixiradThreshActual3String,   asynParamFloat64, &PixiradThreshActual3);
     createParam(PixiradThreshActual4String,   asynParamFloat64, &PixiradThreshActual4);
+    createParam(PixiradHitThreshActualString, asynParamFloat64, &PixiradHitThreshActual);
     createParam(PixiradCountModeString,       asynParamInt32,   &PixiradCountMode);
     createParam(PixiradAutoCalibrateString,   asynParamInt32,   &PixiradAutoCalibrate);
     createParam(PixiradHVValueString,         asynParamFloat64, &PixiradHVValue);
@@ -769,9 +775,9 @@ asynStatus pixirad::setAutoCalParams(int ofs0, int fs0, int ofs2, int fs1, int f
 
 asynStatus pixirad::setThresholds(int ref)
 {
-    double thresholdEnergy[4];
-    double actualThresholdEnergy[4];
-    int thresholdReg[4];
+    double thresholdEnergy[NUM_THRESHOLDS];
+    double actualThresholdEnergy[NUM_THRESHOLDS];
+    int thresholdReg[NUM_THRESHOLDS];
     int vthMax, auFS=7;
     int frameType;
     asynStatus status;
@@ -792,23 +798,25 @@ asynStatus pixirad::setThresholds(int ref)
         countModeString = "NONBI"; 
     }
 
-    getDoubleParam(PixiradThresh1, &thresholdEnergy[0]);
-    getDoubleParam(PixiradThresh2, &thresholdEnergy[1]);
-    getDoubleParam(PixiradThresh3, &thresholdEnergy[2]);
-    getDoubleParam(PixiradThresh4, &thresholdEnergy[3]);
+    getDoubleParam(PixiradThresh1,   &thresholdEnergy[0]);
+    getDoubleParam(PixiradThresh2,   &thresholdEnergy[1]);
+    getDoubleParam(PixiradThresh3,   &thresholdEnergy[2]);
+    getDoubleParam(PixiradThresh4,   &thresholdEnergy[3]);
+    getDoubleParam(PixiradHitThresh, &thresholdEnergy[4]);
     
     // Calculate the optimum register values for the thresholds, and the actual energies
     calculateThresholds(thresholdEnergy, &vthMax, thresholdReg, actualThresholdEnergy);
     
-    setDoubleParam(PixiradThreshActual1, actualThresholdEnergy[0]);
-    setDoubleParam(PixiradThreshActual2, actualThresholdEnergy[1]);
-    setDoubleParam(PixiradThreshActual3, actualThresholdEnergy[2]);
-    setDoubleParam(PixiradThreshActual4, actualThresholdEnergy[3]);
+    setDoubleParam(PixiradThreshActual1,   actualThresholdEnergy[0]);
+    setDoubleParam(PixiradThreshActual2,   actualThresholdEnergy[1]);
+    setDoubleParam(PixiradThreshActual3,   actualThresholdEnergy[2]);
+    setDoubleParam(PixiradThreshActual4,   actualThresholdEnergy[3]);
+    setDoubleParam(PixiradHitThreshActual, actualThresholdEnergy[4]);
     
     if (sensor_.Asic == PIII) {
         epicsSnprintf(toServer_, sizeof(toServer_), 
-                      "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %s %s %d", 
-                      thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0],
+                      "DAQ:! SET_SENSOR_OPERATINGS %d %d %d %d %d %s %s %d", 
+                      thresholdReg[3], thresholdReg[2], thresholdReg[1], thresholdReg[0], thresholdReg[4],
                       readoutModeString, countModeString, vbgMcalDAC_);
     } else {
         epicsSnprintf(toServer_, sizeof(toServer_), 
@@ -830,7 +838,7 @@ asynStatus pixirad::doAutoCalibrate()
     // Need to set REF=0 before doing autocalibrate
     setThresholds(0);
     epicsSnprintf(toServer_, sizeof(toServer_), 
-                  "DAQ:! AUTOCAL_LAST");
+                  "DAQ:! AUTOCAL NOCODES");
     status = writeReadServer();
     // Set REF=1 after autocalibrate
     setThresholds(1);
@@ -1453,7 +1461,8 @@ asynStatus pixirad::writeFloat64(asynUser *pasynUser, epicsFloat64 value)
     } else if ((function == PixiradThresh1) ||
                (function == PixiradThresh2) ||
                (function == PixiradThresh3) ||
-               (function == PixiradThresh4)) {
+               (function == PixiradThresh4) ||
+               (function == PixiradHitThresh)) {
         status = setThresholds(1);
 
     } else {
