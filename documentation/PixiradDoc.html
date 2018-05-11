@@ -10,7 +10,7 @@
     <h1>
       areaDetector Pixirad driver</h1>
     <h2>
-      January 28, 2014</h2>
+      May 11, 2018</h2>
     <h2>
       Mark Rivers</h2>
     <h2>
@@ -32,25 +32,28 @@
     Introduction</h2>
   <p>
     This is an <a href="http://www.aps.anl.gov/epics/">EPICS</a> <a href="areaDetector.html">
-      areaDetector</a> driver for the Pixirad detectors from <a href="http://pixirad.pi.infn.it/">
-        PiXirad</a>.
+      areaDetector</a> driver for the Pixirad detectors from <a href="http://www.pixirad.com/">
+        Pixirad</a>.
   </p>
   <p>
     The Pixirad detector is a pixel array detector with a cadmium teluride (CdTe) sensor,
-    so it has high efficiency at high energy. The base module is 476 x 512 pixels, which
-    is what this driver currently supports. Detectors with more than one base module
-    are available, and will be supported by this driver in the future.</p>
+    so it has high efficiency at high energy. There are 2 versions of the ASIC, the
+    older PII, and the newer PIII. The PII base module is 476 x 512 pixels, while the
+    PIII is 402 x 512 pixels. The detector is available with a single module (Pixirad-1),
+    2 modules (Pixirad-2), and 8 modules (Pixirad-8).
+  </p>
   <p>
     The detector does photon counting of all photons above a programmable energy threshold.
     The detector hardware has 2 energy thresholds and two counters per pixel, so it
-    can collect 2 energy images simultaneously. The firmware supports 4 thresholds,
+    can collect 2 energy images simultaneously. The PII firmware supports 4 thresholds,
     by first collecting 2 energies, and then collecting another image with 2 additional
     energies. The detector can be operated in 1, 2, or 4 color mode. In addition it
     supports deadtime-free (DTF) counting modes where one image is being collected while
     the other is being read out. Both 1 and 2 color DTF modes are supported. The NDArrays
-    produced by this driver are unsigned 16-bit integers. They have dimensions [476,
-    512] for 1 color images, [476, 512, 2] for 2 color images, and [476, 512, 4] for
-    4 color images.
+    produced by this driver are unsigned 16-bit integers. They have dimensions [XSIZE,
+    YSIZE] for 1 color images, [XSIZE, YSIZE, 2] for 2 color images, and [XSIZE, YSIZE,
+    4] for 4 color images. XSIZE=476 for PII and 402 for PIII. YSIZE=NumModules*512
+    for both the PII and PIII.
   </p>
   <p>
     The command interface to the detector is via a TCP/IP socket interface to the detector
@@ -60,14 +63,14 @@
     on port 2224. The status includes temperatures, humidity and high voltage.</p>
   <p>
     The driver receives image data from the detector via UDP broadcast messages on port
-    2223. This data is received by a "UDP listener thread" in the driver, which passes
-    the UDP buffers as they are received via a pointer on an epicsMessageQueue to a
-    "data unpacking thread". This second thread unscrambles the UDP buffers, converts
-    them to areaDetector NDArrays, and does the callbacks to registered plugins. The
-    size of the epicsMessageQueue is controlled by a parameter passed to the driver
-    constructor, and is set to 1500 in the example IOC. This provides a buffer in case
-    the UDP listener thread is receiving images faster than the data unpacking thread
-    can process them.
+    2223 for the Pixirad-1, and port 9999 for the Pixirad-2 and Pixirad-8. This data
+    is received by a "UDP listener thread" in the driver, which passes the UDP buffers
+    as they are received via a pointer on an epicsMessageQueue to a "data unpacking
+    thread". This second thread unscrambles the UDP buffers, converts them to areaDetector
+    NDArrays, and does the callbacks to registered plugins. The size of the epicsMessageQueue
+    is controlled by a parameter passed to the driver constructor, and is set to 1500
+    in the example IOC. This provides a buffer in case the UDP listener thread is receiving
+    images faster than the data unpacking thread can process them.
   </p>
   <p>
     The detector can in principle be on a public network where it will receive its IP
@@ -95,26 +98,36 @@
       <tr>
         <td align="center" colspan="3">
           <b>Implementation of Parameters in asynNDArrayDriver.h and ADDriver.h, and EPICS Record
-            Definitions in ADBase.template and NDFile.template</b></td>
+            Definitions in ADBase.template and NDFile.template</b>
+        </td>
       </tr>
       <tr>
         <th>
-          Parameter index variable</th>
+          Parameter index variable
+        </th>
         <th>
-          EPICS record name</th>
+          EPICS record name
+        </th>
         <th>
-          Description</th>
+          Description
+        </th>
       </tr>
       <tr>
         <td>
-          ADFrameType</td>
+          ADFrameType
+        </td>
         <td>
-          $(P)$(R)FrameType</td>
+          $(P)$(R)FrameType
+        </td>
         <td>
           The choices for the Pixirad are:
           <ul>
-            <li>"1 color low". One color image using threshold 1.</li>
-            <li>"1 color high". One color image using threshold 2.</li>
+            <li>"1 color low". One color image using threshold 1. On the PII this image is all
+              photons with energies above threshold 1. On the PIII this is all photons with energies
+              above threshold 1 and below threshold 2.</li>
+            <li>"1 color high". One color image using threshold 2. In principle threshold 1 is
+              ignorred in this mode. However, on the PIII this only works correctly if threshold1
+              is less than threshold 2.</li>
             <li>"2 color". Two color image using thesholds 1 and 2.</li>
             <li>"4 color". Four color image using thesholds 1, 2, 3, and 4.</li>
             <li>"1 color DTF". One color deadtime-free image using theshold 1.</li>
@@ -123,16 +136,18 @@
           </ul>
           Note that the dimensions of the NDArrays from the Pixirad driver depend on the value
           of FrameType.<br />
-          1 color arrays are 2-D with dimensions [MaxSizeX, MaxSizeY].<br />
-          2 color arrays are 3-D with dimensions [MaxSizeX, MaxSizeY, 2].<br />
-          4 color arrays are 3-D with dimensions[MaxSizeX, MaxSizeY, 4].<br />
+          1 color arrays are 2-D with dimensions [SIZEX, SIZEY].<br />
+          2 color arrays are 3-D with dimensions [SIZEX, SIZEY, 2].<br />
+          4 color arrays are 3-D with dimensions[SIZEX, SIZEY, 4].<br />
         </td>
       </tr>
       <tr>
         <td>
-          ADTriggerMode</td>
+          ADTriggerMode
+        </td>
         <td>
-          $(P)$(R)TriggerMode</td>
+          $(P)$(R)TriggerMode
+        </td>
         <td>
           The choices for the Pixirad are:
           <ul>
@@ -145,41 +160,54 @@
           </ul>
           Note that the minimum time between external trigger pulses is determined by the
           FrameType record. This is discussed in the <a href="#Performance_measurements">Performance
-            Measurements</a> section below. </td>
+            Measurements</a> section below.
+        </td>
       </tr>
       <tr>
         <td>
-          ADTemperature</td>
+          ADTemperature
+        </td>
         <td>
-          $(P)$(R)Temperature</td>
+          $(P)$(R)Temperature
+        </td>
         <td>
-          The setpoint for the cold temperature of the detector.</td>
+          The setpoint for the cold temperature of the detector.
+        </td>
       </tr>
       <tr>
         <td>
-          ADTemperatureActual</td>
+          ADTemperatureActual
+        </td>
         <td>
-          $(P)$(R)TemperatureActual</td>
+          $(P)$(R)TemperatureActual
+        </td>
         <td>
-          The readback of the temperature on the cold side of the Peltier cooler.</td>
+          The readback of the temperature on the cold side of the Peltier cooler.
+        </td>
       </tr>
       <tr>
         <td>
-          ADNumImages</td>
+          ADNumImages
+        </td>
         <td>
-          $(P)$(R)NumImages</td>
+          $(P)$(R)NumImages
+        </td>
         <td>
-          Controls the number of images to acquire.</td>
+          Controls the number of images to acquire.
+        </td>
       </tr>
       <tr>
         <td>
-          ADAcquirePeriod</td>
+          ADAcquirePeriod
+        </td>
         <td>
-          $(P)$(R)AcquirePeriod</td>
+          $(P)$(R)AcquirePeriod
+        </td>
         <td>
           Controls the period between images. If this is greater than the acquisition time
           then the detector will wait until the period has elapsed before collection the next
-          image.</td>
+          image.
+        </td>
       </tr>
     </tbody>
   </table>
@@ -208,136 +236,258 @@
       </tr>
       <tr>
         <th>
-          Parameter index variable</th>
+          Parameter index variable
+        </th>
         <th>
-          asyn interface</th>
+          asyn interface
+        </th>
         <th>
-          Access</th>
+          Access
+        </th>
         <th>
-          Description</th>
+          Description
+        </th>
         <th>
-          drvInfo string</th>
+          drvInfo string
+        </th>
         <th>
-          EPICS record name</th>
+          EPICS record name
+        </th>
         <th>
-          EPICS record type</th>
+          EPICS record type
+        </th>
       </tr>
       <tr>
         <td align="center" colspan="7">
-          <b>Cooling parameters</b></td>
+          <b>System information</b>
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          CoolingState</td>
+          SystemInfo
+        </td>
         <td>
-          asynInt32</td>
+          asynOctet
+        </td>
         <td>
-          r/w</td>
+          r/o
+        </td>
         <td>
-          The state of the Peltier cooler. Choices are "Off" (0) and "On" (1).</td>
+          A string containing information about the detector, read directly from the detector.
+        </td>
         <td>
-          COOLING_STATE</td>
+          SYSTEM_INFO
+        </td>
+        <td>
+          $(P)$(R)SystemInfo
+        </td>
+        <td>
+          waveform
+        </td>
+      </tr>
+      <tr>
+        <td align="center" colspan="7">
+          <b>Counting mode (PIII only)</b>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Pixirad<br />
+          CountMode
+        </td>
+        <td>
+          asynInt32
+        </td>
+        <td>
+          r/w
+        </td>
+        <td>
+          Selects the counting mode. Choices are:
+          <br />
+          0: Normal
+          <br />
+          1: NPI This stands for Neighbor Pixel Inhibit. It prevents counting a photon more
+          than once when charge-sharing occurs.<br />
+          2: NPISUM This stands for Neighbor Pixel Inhibit with Summation. It sums the charge
+          from adjacent pixels when charge-sharing occurs.<br />
+        </td>
+        <td>
+          COUNT_MODE
+        </td>
+        <td>
+          $(P)$(R)CountMode
+          <br />
+          $(P)$(R)CountMode_RBV
+        </td>
+        <td>
+          mbbo
+          <br />
+          mbbi
+        </td>
+      </tr>
+      <tr>
+        <td align="center" colspan="7">
+          <b>Cooling parameters</b>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Pixirad<br />
+          CoolingState
+        </td>
+        <td>
+          asynInt32
+        </td>
+        <td>
+          r/w
+        </td>
+        <td>
+          The state of the Peltier cooler. Choices are "Off" (0) and "On" (1).
+        </td>
+        <td>
+          COOLING_STATE
+        </td>
         <td>
           $(P)$(R)CoolingState<br />
-          $(P)$(R)Cooling_RBV</td>
+          $(P)$(R)Cooling_RBV
+        </td>
         <td>
           bo<br />
-          bi</td>
+          bi
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          HotTemperature</td>
+          HotTemperature
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The readback of the temperature (C) on the hot side of the Peltier cooler.</td>
+          The readback of the temperature (C) on the hot side of the Peltier cooler.
+        </td>
         <td>
-          HOT_TEMPERATURE</td>
+          HOT_TEMPERATURE
+        </td>
         <td>
-          $(P)$(R)HotTemperature_RBV</td>
+          $(P)$(R)HotTemperature_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          BoxTemperature</td>
+          BoxTemperature
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The readback of the ambient temperature (C) in the detector box.</td>
+          The readback of the ambient temperature (C) in the detector box.
+        </td>
         <td>
-          BOX_TEMPERATURE</td>
+          BOX_TEMPERATURE
+        </td>
         <td>
-          $(P)$(R)BoxTemperature_RBV</td>
+          $(P)$(R)BoxTemperature_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          BoxHumidity</td>
+          BoxHumidity
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The readback of the ambient relative humidity (%) in the detector box.</td>
+          The readback of the ambient relative humidity (%) in the detector box.
+        </td>
         <td>
-          BOX_HUMIDITY</td>
+          BOX_HUMIDITY
+        </td>
         <td>
-          $(P)$(R)BoxHumidity_RBV</td>
+          $(P)$(R)BoxHumidity_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          DewPoint</td>
+          DewPoint
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The calculated dew point (C) based on the BoxHumidity.</td>
+          The calculated dew point (C) based on the BoxHumidity.
+        </td>
         <td>
-          DEW_POINT</td>
+          DEW_POINT
+        </td>
         <td>
-          $(P)$(R)DewPoint_RBV</td>
+          $(P)$(R)DewPoint_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          PeltierPower</td>
+          PeltierPower
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The power level of the Peltier cooler (%).</td>
+          The power level of the Peltier cooler (%).
+        </td>
         <td>
-          PELTIER_POWER</td>
+          PELTIER_POWER
+        </td>
         <td>
-          $(P)$(R)PeltierPower_RBV</td>
+          $(P)$(R)PeltierPower_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          CoolingStatus</td>
+          CoolingStatus
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
           The status of the cooling system. Values are:<br />
           0 - "OK"
@@ -352,26 +502,34 @@
           6 - "T Cold Error" This means that the cold temperature is greater than 40 C.<br />
           <br />
           If the CoolingStatus_RBV is any of the Error states then the driver will automatically
-          turn off the Peltier cooler.</td>
+          turn off the Peltier cooler.
+        </td>
         <td>
-          COOLING_STATUS</td>
+          COOLING_STATUS
+        </td>
         <td>
-          $(P)$(R)CoolingStatus_RBV</td>
+          $(P)$(R)CoolingStatus_RBV
+        </td>
         <td>
-          mbbi</td>
+          mbbi
+        </td>
       </tr>
       <tr>
         <td align="center" colspan="7">
-          <b>High voltage parameters</b></td>
+          <b>High voltage parameters</b>
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          HVMode</td>
+          HVMode
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           High voltage mode. Choices are:<br />
           0 - "Manual"
@@ -383,26 +541,33 @@
           when an acquisition is started and automatically turn off when the acquisition is
           complete. This can improve the image quality, because the detector is subject to
           charge trapping when used with high x-ray fluxes, and periodically turning off the
-          high voltage helps to clear the trapped charge.</td>
+          high voltage helps to clear the trapped charge.
+        </td>
         <td>
-          HV_MODE</td>
+          HV_MODE
+        </td>
         <td>
           $(P)$(R)HVMode
           <br />
-          $(P)$(R)HVMode_RBV</td>
+          $(P)$(R)HVMode_RBV
+        </td>
         <td>
           bo
           <br />
-          bi</td>
+          bi
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          HVState</td>
+          HVState
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           High voltage state. Choices are:<br />
           0 - "Off"
@@ -410,87 +575,115 @@
           1 - "On"
           <br />
           This record turns the high voltage off and on. If HVMode is Auto then the high voltage
-          will be turned on during an acquisition even if HVState is off.</td>
+          will be turned on during an acquisition even if HVState is off.
+        </td>
         <td>
-          HV_STATE</td>
+          HV_STATE
+        </td>
         <td>
           $(P)$(R)HVState
           <br />
-          $(P)$(R)HVState_RBV</td>
+          $(P)$(R)HVState_RBV
+        </td>
         <td>
           bo
           <br />
-          bi</td>
+          bi
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          HVValue</td>
+          HVValue
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           The high voltage value that will be applied to the detector when HVState=On or when
           HVMode=Auto and an acquisition is in progress. The allowed range is 0 to 400 volts.
         </td>
         <td>
-          HV_VALUE</td>
+          HV_VALUE
+        </td>
         <td>
           $(P)$(R)HVValue
           <br />
-          $(P)$(R)HVValue_RBV</td>
+          $(P)$(R)HVValue_RBV
+        </td>
         <td>
           ao
           <br />
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          HVActual</td>
+          HVActual
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The actual high voltage currently being applied to the detector. </td>
+          The actual high voltage currently being applied to the detector.
+        </td>
         <td>
-          HV_ACTUAL</td>
+          HV_ACTUAL
+        </td>
         <td>
-          $(P)$(R)HVActual_RBV</td>
+          $(P)$(R)HVActual_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          HVCurrent</td>
+          HVCurrent
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The actual high voltage current. </td>
+          The actual high voltage current.
+        </td>
         <td>
-          HV_CURRENT</td>
+          HV_CURRENT
+        </td>
         <td>
-          $(P)$(R)HVCurrent_RBV</td>
+          $(P)$(R)HVCurrent_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td align="center" colspan="7">
-          <b>Threshold parameters</b></td>
+          <b>Threshold parameters</b>
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          ThresholdN (N=1-4)</td>
+          ThresholdN (N=1-4)
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           Requested threshold energy in keV. There are 4 energy thresholds. The threshold
           energies are controlled by a single high-resolution register (VThMax) with values
@@ -500,254 +693,389 @@
           as possible to their requested values using only the low-resolution registers.
         </td>
         <td>
-          THRESHOLDN (N=1-4)</td>
+          THRESHOLDN (N=1-4)
+        </td>
         <td>
           $(P)$(R)ThresholdN (N=1-4)<br />
-          $(P)$(R)ThresholdN_RBV (N=1-4)</td>
+          $(P)$(R)ThresholdN_RBV (N=1-4)
+        </td>
         <td>
           ao
           <br />
-          ai </td>
+          ai
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          ThresholdActualN (N=1-4)</td>
+          ThresholdActualN (N=1-4)
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
           Actual threshold energy in keV. This will be as close as possible to the requested
-          value, subject to the constraints and algorithm explained above.</td>
+          value, subject to the constraints and algorithm explained above.
+        </td>
         <td>
-          THRESHOLD_ACTUALN (N=1-4)</td>
+          THRESHOLD_ACTUALN (N=1-4)
+        </td>
         <td>
-          $(P)$(R)ThresholdActualN_RBV (N=1-4)</td>
+          $(P)$(R)ThresholdActualN_RBV (N=1-4)
+        </td>
         <td>
-          ai </td>
+          ai
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Pixirad<br />
+          HitThreshold
+        </td>
+        <td>
+          asynFloat64
+        </td>
+        <td>
+          r/w
+        </td>
+        <td>
+          This is only used on the PIII ASIC. It sets the threshold in keV where the PIII
+          will consider a photon "hit" to have ocurred. This threshold is mainly intended
+          for use when CountMode=NPI or NPISUM. However, even when CountMode=Normal it must
+          always be set to a value less than Threshold 1.
+        </td>
+        <td>
+          HIT_THRESHOLD
+        </td>
+        <td>
+          $(P)$(R)HitThreshold<br />
+          $(P)$(R)HitThreshold_RBV
+        </td>
+        <td>
+          ao
+          <br />
+          ai
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Pixirad<br />
+          HitThresholdActual
+        </td>
+        <td>
+          asynFloat64
+        </td>
+        <td>
+          r/o
+        </td>
+        <td>
+          Actual hit threshold energy in keV. This will be as close as possible to the requested
+          value, subject to the constraints and algorithm explained above.
+        </td>
+        <td>
+          HIT_THRESHOLD_ACTUAL
+        </td>
+        <td>
+          $(P)$(R)HitThresholdActual_RBV
+        </td>
+        <td>
+          ai
+        </td>
       </tr>
       <tr>
         <td align="center" colspan="7">
-          <b>External sync parameters</b></td>
+          <b>External sync parameters</b>
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          SyncInPolarity</td>
+          SyncInPolarity
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           Polarity of the Sync In signal. Choices are:
           <br />
           0 - "Pos."
           <br />
-          1 - "Neg."</td>
+          1 - "Neg."
+        </td>
         <td>
-          SYNC_IN_POLARITY</td>
+          SYNC_IN_POLARITY
+        </td>
         <td>
           $(P)$(R)SyncInPolarity<br />
-          $(P)$(R)SyncInPolarity_RBV</td>
+          $(P)$(R)SyncInPolarity_RBV
+        </td>
         <td>
           bo
           <br />
-          bi</td>
+          bi
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          SyncOutPolarity</td>
+          SyncOutPolarity
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           Polarity of the Sync Out signal. Choices are:
           <br />
           0 - "Pos."
           <br />
-          1 - "Neg."</td>
+          1 - "Neg."
+        </td>
         <td>
-          SYNC_OUT_POLARITY</td>
+          SYNC_OUT_POLARITY
+        </td>
         <td>
           $(P)$(R)SyncOutPolarity<br />
-          $(P)$(R)SyncOutPolarity_RBV</td>
+          $(P)$(R)SyncOutPolarity_RBV
+        </td>
         <td>
           bo
           <br />
-          bi</td>
+          bi
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          SyncOutFunction</td>
+          SyncOutFunction
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           Function of the Sync Out signal. Choices are:
           <br />
           0 - "Shutter" The Sync Out signal is high while the detector is collecting.<br />
           1 - "Read done" The Sync Out signal outputs a pulse when readout is complete.<br />
-          2 - "Read" The Sync Out signal is high while the detector is reading out.</td>
+          2 - "Read" The Sync Out signal is high while the detector is reading out.
+        </td>
         <td>
-          SYNC_OUT_FUNCTION</td>
+          SYNC_OUT_FUNCTION
+        </td>
         <td>
           $(P)$(R)SyncOutFunction<br />
-          $(P)$(R)SyncOutFunction_RBV</td>
+          $(P)$(R)SyncOutFunction_RBV
+        </td>
         <td>
           mbbo
           <br />
-          mbbi</td>
+          mbbi
+        </td>
       </tr>
       <tr>
         <td align="center" colspan="7">
-          <b>Data collection status parameters</b></td>
+          <b>Data collection status parameters</b>
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          ColorsCollected</td>
+          ColorsCollected
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The number of colors collected so far for the current image.</td>
+          The number of colors collected so far for the current image.
+        </td>
         <td>
-          COLORS_COLLECTED</td>
+          COLORS_COLLECTED
+        </td>
         <td>
-          $(P)$(R)ColorsCollected_RBV</td>
+          $(P)$(R)ColorsCollected_RBV
+        </td>
         <td>
-          longin</td>
+          longin
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          UDPBuffersRead</td>
+          UDPBuffersRead
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
           The number of UDP buffers (images) read by the UDP listener thread for the current
-          acquisition.</td>
+          acquisition.
+        </td>
         <td>
-          UDP_BUFFERS_READ</td>
+          UDP_BUFFERS_READ
+        </td>
         <td>
-          $(P)$(R)UDPBuffersRead_RBV</td>
+          $(P)$(R)UDPBuffersRead_RBV
+        </td>
         <td>
-          longin</td>
+          longin
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          UDPBuffersMax</td>
+          UDPBuffersMax
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
           The maximum number of UDP buffers (images) for UDP listener thread. This is set
-          at startup.</td>
+          at startup.
+        </td>
         <td>
-          UDP_BUFFERS_MAX</td>
+          UDP_BUFFERS_MAX
+        </td>
         <td>
-          $(P)$(R)UDPBuffersMax_RBV</td>
+          $(P)$(R)UDPBuffersMax_RBV
+        </td>
         <td>
-          longin</td>
+          longin
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          UDPBuffersFree</td>
+          UDPBuffersFree
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The number of free UDP buffers (images).</td>
+          The number of free UDP buffers (images).
+        </td>
         <td>
-          UDP_BUFFERS_FREE</td>
+          UDP_BUFFERS_FREE
+        </td>
         <td>
-          $(P)$(R)UDPBuffersFree_RBV</td>
+          $(P)$(R)UDPBuffersFree_RBV
+        </td>
         <td>
-          longin</td>
+          longin
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          UDPSpeed</td>
+          UDPSpeed
+        </td>
         <td>
-          asynFloat64</td>
+          asynFloat64
+        </td>
         <td>
-          r/o</td>
+          r/o
+        </td>
         <td>
-          The speed with which the last UDP buffer was received (MB/s).</td>
+          The speed with which the last UDP buffer was received (MB/s).
+        </td>
         <td>
-          UDP_SPEED</td>
+          UDP_SPEED
+        </td>
         <td>
-          $(P)$(R)UDPSpeed_RBV</td>
+          $(P)$(R)UDPSpeed_RBV
+        </td>
         <td>
-          ai</td>
+          ai
+        </td>
       </tr>
       <tr>
         <td align="center" colspan="7">
-          <b>Calibration and reset parameters</b></td>
+          <b>Calibration and reset parameters</b>
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          AutoCalibrate</td>
+          AutoCalibrate
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           Sends a command to the detector to perform an autocalibration. The detector makes
           adjustments to achieve uniform pixel response. This operation <b>must</b> be performed
           at least once after the detector is power-cycled, and whenever necessary as the
           chip temperature and/or supply voltages may drift with time and environmental conditions.
           If autocalibration has not been performed then there will be many "hot" (non-zero)
-          pixels in the image with no x-rays. When an autocalibration is performed the detector
-          sends 2 images, one collected before the calibration and one after the calibration.
-          These images always have a range of 0-31 counts and show the correction applied
-          to each pixel.</td>
+          pixels in the image with no x-rays.
+        </td>
         <td>
-          AUTO_CALIBRATE</td>
+          AUTO_CALIBRATE
+        </td>
         <td>
           $(P)$(R)AutoCalibrate<br />
-          $(P)$(R)AutoCalibrate_RBV</td>
+          $(P)$(R)AutoCalibrate_RBV
+        </td>
         <td>
           bo<br />
-          bi</td>
+          bi
+        </td>
       </tr>
       <tr>
         <td>
           Pixirad<br />
-          SystemReset</td>
+          SystemReset
+        </td>
         <td>
-          asynInt32</td>
+          asynInt32
+        </td>
         <td>
-          r/w</td>
+          r/w
+        </td>
         <td>
           Writing 1 to this record sends a command to reset detector to its initial state.
           This causes the sockets to disconnect, and it takes about 30 seconds for the system
           to recover. Once it recovers the driver then sends commands to set all of the programmable
           parameters (thresholds, cooling, high voltage, etc.) to the current values in the
           EPICS output records. When the system is available again SystemReset record will
-          go back to 0.</td>
+          go back to 0.
+        </td>
         <td>
-          SYSTEM_RESET</td>
+          SYSTEM_RESET
+        </td>
         <td>
           $(P)$(R)SystemReset<br />
-          $(P)$(R)SystemReset_RBV</td>
+          $(P)$(R)SystemReset_RBV
+        </td>
         <td>
           bo<br />
-          bi</td>
+          bi
+        </td>
       </tr>
     </tbody>
   </table>
@@ -809,179 +1137,245 @@
     <tbody>
       <tr>
         <th>
-          FrameType</th>
+          FrameType
+        </th>
         <th>
-          AcquireTime</th>
+          AcquireTime
+        </th>
         <th>
-          Frames/sec</th>
+          Frames/sec
+        </th>
       </tr>
       <tr>
         <td>
-          1 color low</td>
+          1 color low
+        </td>
         <td>
-          0.02 </td>
+          0.02
+        </td>
         <td>
-          35.7 </td>
+          35.7
+        </td>
       </tr>
       <tr>
         <td>
-          1 color low</td>
+          1 color low
+        </td>
         <td>
-          0.01 </td>
+          0.01
+        </td>
         <td>
-          57.4</td>
+          57.4
+        </td>
       </tr>
       <tr>
         <td>
-          1 color low</td>
+          1 color low
+        </td>
         <td>
-          0.01 </td>
+          0.01
+        </td>
         <td>
-          57.4</td>
+          57.4
+        </td>
       </tr>
       <tr>
         <td>
-          1 color low</td>
+          1 color low
+        </td>
         <td>
-          0.005 </td>
+          0.005
+        </td>
         <td>
-          83.3</td>
+          83.3
+        </td>
       </tr>
       <tr>
         <td>
-          1 color low</td>
+          1 color low
+        </td>
         <td>
-          0.001 </td>
+          0.001
+        </td>
         <td>
-          125.0</td>
+          125.0
+        </td>
       </tr>
       <tr>
         <td>
-          1 color DTF</td>
+          1 color DTF
+        </td>
         <td>
-          0.02 </td>
+          0.02
+        </td>
         <td>
-          47.3</td>
+          47.3
+        </td>
       </tr>
       <tr>
         <td>
-          1 color DTF</td>
+          1 color DTF
+        </td>
         <td>
-          0.01 </td>
+          0.01
+        </td>
         <td>
-          93.8</td>
+          93.8
+        </td>
       </tr>
       <tr>
         <td>
-          1 color DTF</td>
+          1 color DTF
+        </td>
         <td>
-          0.005 </td>
+          0.005
+        </td>
         <td>
-          143.0</td>
+          143.0
+        </td>
       </tr>
       <tr>
         <td>
-          1 color DTF</td>
+          1 color DTF
+        </td>
         <td>
-          0.001 </td>
+          0.001
+        </td>
         <td>
-          143.0</td>
+          143.0
+        </td>
       </tr>
       <tr>
         <td>
-          2 color</td>
+          2 color
+        </td>
         <td>
-          0.02 </td>
+          0.02
+        </td>
         <td>
-          28.5</td>
+          28.5
+        </td>
       </tr>
       <tr>
         <td>
-          2 color</td>
+          2 color
+        </td>
         <td>
-          0.01 </td>
+          0.01
+        </td>
         <td>
-          41</td>
+          41
+        </td>
       </tr>
       <tr>
         <td>
-          2 color</td>
+          2 color
+        </td>
         <td>
-          0.005 </td>
+          0.005
+        </td>
         <td>
-          52</td>
+          52
+        </td>
       </tr>
       <tr>
         <td>
-          2 color</td>
+          2 color
+        </td>
         <td>
-          0.001 </td>
+          0.001
+        </td>
         <td>
-          66</td>
+          66
+        </td>
       </tr>
       <tr>
         <td>
-          2 color DTF</td>
+          2 color DTF
+        </td>
         <td>
-          0.02 </td>
+          0.02
+        </td>
         <td>
-          23.4</td>
+          23.4
+        </td>
       </tr>
       <tr>
         <td>
-          2 color DTF</td>
+          2 color DTF
+        </td>
         <td>
-          0.01 </td>
+          0.01
+        </td>
         <td>
-          46</td>
+          46
+        </td>
       </tr>
       <tr>
         <td>
-          2 color DTF</td>
+          2 color DTF
+        </td>
         <td>
-          0.005 </td>
+          0.005
+        </td>
         <td>
-          71</td>
+          71
+        </td>
       </tr>
       <tr>
         <td>
-          2 color DTF</td>
+          2 color DTF
+        </td>
         <td>
-          0.001 </td>
+          0.001
+        </td>
         <td>
-          71</td>
+          71
+        </td>
       </tr>
       <tr>
         <td>
-          4 color</td>
+          4 color
+        </td>
         <td>
-          0.02 </td>
+          0.02
+        </td>
         <td>
-          14.3</td>
+          14.3
+        </td>
       </tr>
       <tr>
         <td>
-          4 color</td>
+          4 color
+        </td>
         <td>
-          0.01 </td>
+          0.01
+        </td>
         <td>
-          20</td>
+          20
+        </td>
       </tr>
       <tr>
         <td>
-          4 color</td>
+          4 color
+        </td>
         <td>
-          0.005 </td>
+          0.005
+        </td>
         <td>
-          26</td>
+          26
+        </td>
       </tr>
       <tr>
         <td>
-          4 color</td>
+          4 color
+        </td>
         <td>
-          0.001 </td>
+          0.001
+        </td>
         <td>
-          33</td>
+          33
+        </td>
       </tr>
     </tbody>
   </table>
