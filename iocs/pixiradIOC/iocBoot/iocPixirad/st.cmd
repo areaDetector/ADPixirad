@@ -19,10 +19,10 @@ epicsEnvSet("DATA_PORT_BUFFERS", "1500")
 epicsEnvSet("PORT",   "PIXI")
 # The queue size for all plugins
 epicsEnvSet("QSIZE",  "20")
-# The maximim image width; used for row profiles in the NDPluginStats plugin
+# The detector width; used by the driver and for row profiles in the NDPluginStats plugin
 #epicsEnvSet("XSIZE",  "476")
 epicsEnvSet("XSIZE",  "402")
-# The maximim image height; used for column profiles in the NDPluginStats plugin
+# The detector height; used by the driver and for column profiles in the NDPluginStats plugin
 epicsEnvSet("YSIZE",  "1024")
 #epicsEnvSet("YSIZE",  "512")
 # The maximum number of time seried points in the NDPluginStats plugin
