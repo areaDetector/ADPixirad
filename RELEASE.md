@@ -20,11 +20,14 @@ Release Notes
 =============
 R2-2 (XXX-May-2018)
 * Added support for the PIXI-III chip
-  - NPI and NPISUM count modes.
-  - NOTE: These count modes need to be tested before R2-2 is released
-* R2-2 needs to be tested on older PIXI-II chip models to make sure it still works
-* Documentation needs to be updated for new CountMode parameter
-* Need to document that 1 Color Low is now the counts between Thresh1 and Thresh2
+  - New CountMode record to select Normal, NPI and NPISUM count modes.
+  - New HitThreshold record to control the VtHit value.
+  - Added new pixiradAutoCal iocsh command to set the 7 calibration values unique to each PIII detector.
+* Changed AUTOCAL so that it does not read back the calibration images.
+  These were not useful, added complexity, and could be confusing to the user.
+* TODO before releasing R2-2  
+  - Test that older PIXI-II chip models still work
+  - Test NPI and NPISUM count modes 
 
 R2-1 (16-April-2015)
 ----
