@@ -10,7 +10,7 @@ epicsEnvSet("PREFIX", "13PR1:")
 epicsEnvSet("COMMAND_PORT", "PIXI_CMD")
 # The UDP socket for status
 epicsEnvSet("STATUS_PORT", "2224")
-# The UDP socket for data.  Pixitrad-1 uses 2223, Pixirad-2 uses 9999
+# The UDP socket for data.  Pixirad-1 uses 2223, Pixirad-2 uses 9999
 #epicsEnvSet("DATA_PORT", "2223")
 epicsEnvSet("DATA_PORT", "9999")
 # Number of data port buffers
