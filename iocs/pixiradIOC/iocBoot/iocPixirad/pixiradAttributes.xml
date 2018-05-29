@@ -1,0 +1,18 @@
+<?xml version="1.0" standalone="no" ?>
+<!-- Attributes -->
+<Attributes
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../../../ADCore/XML_schema/NDAttributes.xsd"
+    >
+    <Attribute name="AcquireTime"         type="EPICS_PV" source="13PR1:cam1:AcquireTime_RBV"       dbrtype="DBR_NATIVE"  description="Camera acquire time"/>
+    <Attribute name="FrameType"           type="EPICS_PV" source="13PR1:cam1:FrameType_RBV"         dbrtype="DBR_STRING"  description="Frame type"/>
+    <Attribute name="CountMode"           type="EPICS_PV" source="13PR1:cam1:CountMode_RBV"         dbrtype="DBR_STRING"  description="Count mode"/>
+    <Attribute name="Threshold1"          type="EPICS_PV" source="13PR1:cam1:ThresholdActual1_RBV"  dbrtype="DBR_NATIVE"  description="Threshold 1"/>
+    <Attribute name="Threshold2"          type="EPICS_PV" source="13PR1:cam1:ThresholdActual2_RBV"  dbrtype="DBR_NATIVE"  description="Threshold 2"/>
+    <Attribute name="Threshold3"          type="EPICS_PV" source="13PR1:cam1:ThresholdActual3_RBV"  dbrtype="DBR_NATIVE"  description="Threshold 3"/>
+    <Attribute name="Threshold4"          type="EPICS_PV" source="13PR1:cam1:ThresholdActual4_RBV"  dbrtype="DBR_NATIVE"  description="Threshold 4"/>
+    <Attribute name="ColdTemp"            type="EPICS_PV" source="13PR1:cam1:TemperatureActual"     dbrtype="DBR_NATIVE"  description="Cold temperature"/>
+    <Attribute name="Model"               type="EPICS_PV" source="13PR1:cam1:Model_RBV"             dbrtype="DBR_NATIVE"  description="Cold temperature"/>
+    <Attribute name="SerialNumber"        type="EPICS_PV" source="13PR1:cam1:SerialNumber_RBV"      dbrtype="DBR_NATIVE"  description="Cold temperature"/>
+</Attributes>
+
