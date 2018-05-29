@@ -27,7 +27,6 @@ R2-2 (XXX-May-2018)
   These were not useful, added complexity, and could be confusing to the user.
 * TODO before releasing R2-2  
   - Test that older PIXI-II chip models still work
-  - Test NPI and NPISUM count modes 
 
 R2-1 (16-April-2015)
 ----
