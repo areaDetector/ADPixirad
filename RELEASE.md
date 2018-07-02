@@ -18,15 +18,17 @@ files respectively, in the configure/ directory of the appropriate release of th
 
 Release Notes
 =============
-R2-2 (XXX-May-2018)
+R2-2 (2-July-2018)
+----
 * Added support for the PIXI-III chip
   - New CountMode record to select Normal, NPI and NPISUM count modes.
   - New HitThreshold record to control the VtHit value.
   - Added new pixiradAutoCal iocsh command to set the 7 calibration values unique to each PIII detector.
 * Changed AUTOCAL so that it does not read back the calibration images.
   These were not useful, added complexity, and could be confusing to the user.
-* TODO before releasing R2-2  
-  - Test that older PIXI-II chip models still work
+* Added support for new PVs in ADCore R3-3 in opi files (NumQueuedArrays, EmptyFreeList, etc.)
+* Changed configure/RELEASE files for compatibility with areaDetector R3-3.
+* Improved op/*/autoconvert/* files with better medm files and better converters.
 
 R2-1 (16-April-2015)
 ----
