@@ -922,7 +922,7 @@ int apply_special_configurations_tobox(BOX *tempbox,SENSOR Sens){
 		/***************************/
 		//strncpy(temp_str,"SYS:! SET_MEAS_DEST_ADD 192.168.0.255 9999\n",MAX_MSG_STR_LENGTH);
 		//ret=pixirad_send_cmd(tempbox,temp_str, NULL,0,0);
-		//cambiata strategia: adesso il numero di porta è cambiato nel udp thread
+		//cambiata strategia: adesso il numero di porta cambiato nel udp thread
 		/***************************/
 		snprintf(temp_str,MAX_MSG_STR_LENGTH,"SYS:! SET_ALARMS %d %d %d %d %d %d %d\n",
 				DEF_BOX_RH_AL,

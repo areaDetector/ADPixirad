@@ -319,7 +319,7 @@ printf("module_data_parser_thread: got process_buf_ptr=%p\n", process_buf_ptr);
         if (verbose>=1)printf("PROC:pocessing buffer released\n");
 
     }
-    free(local_buffer_ptr);//qui non ci arriverà mai!!!!
+    free(local_buffer_ptr);//qui non ci arriver mai!!!!
 }
 
 typedef enum{FRAG_ID,NOFRAG_ID} id_mode;
