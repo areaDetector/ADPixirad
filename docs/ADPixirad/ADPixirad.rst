@@ -395,7 +395,7 @@ from C/C++ or from the EPICS IOC shell. ::
 
 
 For details on the meaning of the parameters to this function refer to the
-detailed documentation on the pixiradConfig function in the ` pixirad.cpp
+detailed documentation on the pixiradConfig function in the `pixirad.cpp
 documentation`_ and in the documentation for the constructor for the `pixirad
 class`_.
 
