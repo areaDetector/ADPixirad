@@ -4,6 +4,8 @@ areaDetector Pixirad driver
 
 :author: Mark Rivers, University of Chicago
 
+.. contents:: Contents
+
 
 Introduction
 ------------
