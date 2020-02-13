@@ -72,6 +72,7 @@ of the standard driver parameters.
 .. cssclass:: table-bordered table-striped table-hover
 .. flat-table::
   :header-rows: 2
+  :widths: 20 20 60
 
 
   * - **Implementation of Parameters in asynNDArrayDriver.h and ADDriver.h, and EPICS Record
