@@ -399,6 +399,14 @@ detailed documentation on the pixiradConfig function in the `pixirad.cpp
 documentation`_ and in the documentation for the constructor for the `pixirad
 class`_.
 
+Example st.cmd startup file
+---------------------------
+
+.. toctree::
+   :hidden:
+   
+   st_cmd.rst
+
 There an example IOC boot directory and startup script provided with
 areaDetector: :doc:`st_cmd`.
 
