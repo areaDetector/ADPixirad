@@ -7,5 +7,5 @@ driver for the Pixirad detectors from
 [PiXirad](http://pixirad.pi.infn.it/).
 
 Additional information:
-* [Documentation](https://areadetector.github.io/master/ADPixirad/ADPixirad.html)
+* [Documentation](https://areadetector.github.io/areaDetector/ADPixirad/ADPixirad.html)
 * [Release notes and links to source and binary releases](RELEASE.md)
