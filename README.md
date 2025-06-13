@@ -6,6 +6,8 @@ An
 driver for the Pixirad detectors from 
 [PiXirad](http://pixirad.pi.infn.it/).
 
+**This repository is no longer active and was archived on June 13, 2025.**
+
 Additional information:
 * [Documentation](https://areadetector.github.io/areaDetector/ADPixirad/ADPixirad.html)
 * [Release notes and links to source and binary releases](RELEASE.md)
